@@ -82,32 +82,6 @@ export default function HomePage({ dailyTotals, goals, streak, onNavigate }: Hom
         </button>
       </motion.div>
 
-      {/* Recent Activity */}
-      <motion.div variants={item}>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-bold">Ostatnia aktywność</h3>
-          <button onClick={() => onNavigate('progress')} className="text-xs font-semibold text-primary flex items-center gap-0.5">
-            Zobacz więcej <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-        <div className="space-y-2">
-          {[
-            { icon: '🏋️', title: 'Push Day', subtitle: 'Wczoraj • 65 min', value: '6 ćwiczeń' },
-            { icon: '📏', title: 'Pomiar wagi', subtitle: 'Wczoraj • 80.5 kg', value: '-0.5 kg' },
-            { icon: '🍽️', title: 'Cel kaloryczny', subtitle: 'Wczoraj', value: '✅ Osiągnięty' },
-          ].map((act, i) => (
-            <div key={i} className="ios-card p-3.5 flex items-center gap-3">
-              <span className="text-xl">{act.icon}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{act.title}</p>
-                <p className="text-xs text-muted-foreground">{act.subtitle}</p>
-              </div>
-              <span className="text-xs font-bold text-primary">{act.value}</span>
-            </div>
-          ))}
-        </div>
-      </motion.div>
-
       {/* Weekly Check-in */}
       <motion.div variants={item} className="mt-4 ios-card p-4">
         <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
