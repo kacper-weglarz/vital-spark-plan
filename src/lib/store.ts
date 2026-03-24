@@ -27,10 +27,50 @@ export interface BodyMeasurement {
   date: string;
   weight?: number;
   waist?: number;
+  belly?: number;
   hips?: number;
   chest?: number;
   bicepLeft?: number;
   bicepRight?: number;
+  thighLeft?: number;
+  thighRight?: number;
+  calfLeft?: number;
+  calfRight?: number;
+}
+
+export interface TrainingPlan {
+  id: string;
+  name: string;
+  exercises: PlanExercise[];
+}
+
+export interface PlanExercise {
+  id: string;
+  name: string;
+  sets: number;
+  reps: number;
+  restTime: number;
+  weight: number;
+  previousWeight?: number;
+}
+
+export interface ScheduledWorkout {
+  date: string;
+  planId: string;
+}
+
+export interface UserProfile {
+  initialWeight?: number;
+  birthDate?: string;
+  height?: number;
+  goalType: 'cut' | 'bulk' | 'maintain';
+  targetWeight?: number;
+  monthlyChange?: number;
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
+  calorieTarget: number;
+  proteinTarget: number;
+  carbsTarget: number;
+  fatTarget: number;
 }
 
 export interface ExerciseSet {
