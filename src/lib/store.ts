@@ -27,10 +27,50 @@ export interface BodyMeasurement {
   date: string;
   weight?: number;
   waist?: number;
+  belly?: number;
   hips?: number;
   chest?: number;
   bicepLeft?: number;
   bicepRight?: number;
+  thighLeft?: number;
+  thighRight?: number;
+  calfLeft?: number;
+  calfRight?: number;
+}
+
+export interface TrainingPlan {
+  id: string;
+  name: string;
+  exercises: PlanExercise[];
+}
+
+export interface PlanExercise {
+  id: string;
+  name: string;
+  sets: number;
+  reps: number;
+  restTime: number;
+  weight: number;
+  previousWeight?: number;
+}
+
+export interface ScheduledWorkout {
+  date: string;
+  planId: string;
+}
+
+export interface UserProfile {
+  initialWeight?: number;
+  birthDate?: string;
+  height?: number;
+  goalType: 'cut' | 'bulk' | 'maintain';
+  targetWeight?: number;
+  monthlyChange?: number;
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
+  calorieTarget: number;
+  proteinTarget: number;
+  carbsTarget: number;
+  fatTarget: number;
 }
 
 export interface ExerciseSet {
@@ -188,10 +228,10 @@ export function useUserGoals() {
 
 export function useBodyMeasurements() {
   const [measurements, setMeasurements] = useState<BodyMeasurement[]>([
-    { id: '1', date: '2025-03-01', weight: 82, waist: 84, chest: 102, bicepLeft: 36, bicepRight: 37 },
-    { id: '2', date: '2025-03-08', weight: 81.5, waist: 83.5, chest: 102, bicepLeft: 36.5, bicepRight: 37 },
-    { id: '3', date: '2025-03-15', weight: 81, waist: 83, chest: 102.5, bicepLeft: 36.5, bicepRight: 37.5 },
-    { id: '4', date: '2025-03-22', weight: 80.5, waist: 82.5, chest: 103, bicepLeft: 37, bicepRight: 37.5 },
+    { id: '1', date: '2025-03-01', weight: 82, waist: 84, belly: 88, chest: 102, bicepLeft: 36, bicepRight: 37, thighLeft: 58, thighRight: 59, calfLeft: 37, calfRight: 37.5 },
+    { id: '2', date: '2025-03-08', weight: 81.5, waist: 83.5, belly: 87, chest: 102, bicepLeft: 36.5, bicepRight: 37, thighLeft: 58, thighRight: 59, calfLeft: 37, calfRight: 37.5 },
+    { id: '3', date: '2025-03-15', weight: 81, waist: 83, belly: 86.5, chest: 102.5, bicepLeft: 36.5, bicepRight: 37.5, thighLeft: 58.5, thighRight: 59.5, calfLeft: 37.5, calfRight: 38 },
+    { id: '4', date: '2025-03-22', weight: 80.5, waist: 82.5, belly: 86, chest: 103, bicepLeft: 37, bicepRight: 37.5, thighLeft: 59, thighRight: 60, calfLeft: 37.5, calfRight: 38 },
   ]);
 
   const addMeasurement = useCallback((m: Omit<BodyMeasurement, 'id'>) => {
@@ -199,6 +239,72 @@ export function useBodyMeasurements() {
   }, []);
 
   return { measurements, addMeasurement };
+}
+
+export function useTrainingPlans() {
+  const [plans, setPlans] = useState<TrainingPlan[]>([
+    {
+      id: '1', name: 'Push Day',
+      exercises: SAMPLE_WORKOUTS[0].exercises.map((e, i) => ({ id: String(i), name: e.name, sets: e.sets, reps: e.reps, restTime: 90, weight: 0 })),
+    },
+    {
+      id: '2', name: 'Pull Day',
+      exercises: SAMPLE_WORKOUTS[1].exercises.map((e, i) => ({ id: String(i), name: e.name, sets: e.sets, reps: e.reps, restTime: 90, weight: 0 })),
+    },
+    {
+      id: '3', name: 'Leg Day',
+      exercises: SAMPLE_WORKOUTS[2].exercises.map((e, i) => ({ id: String(i), name: e.name, sets: e.sets, reps: e.reps, restTime: 90, weight: 0 })),
+    },
+  ]);
+
+  const addPlan = useCallback((plan: Omit<TrainingPlan, 'id'>) => {
+    setPlans(prev => [...prev, { ...plan, id: Date.now().toString() }]);
+  }, []);
+
+  const updatePlan = useCallback((id: string, plan: Partial<TrainingPlan>) => {
+    setPlans(prev => prev.map(p => p.id === id ? { ...p, ...plan } : p));
+  }, []);
+
+  const removePlan = useCallback((id: string) => {
+    setPlans(prev => prev.filter(p => p.id !== id));
+  }, []);
+
+  return { plans, addPlan, updatePlan, removePlan };
+}
+
+export function useScheduledWorkouts() {
+  const [scheduled, setScheduled] = useState<ScheduledWorkout[]>([]);
+
+  const scheduleWorkout = useCallback((date: string, planId: string) => {
+    setScheduled(prev => {
+      const existing = prev.find(s => s.date === date);
+      if (existing) return prev.map(s => s.date === date ? { ...s, planId } : s);
+      return [...prev, { date, planId }];
+    });
+  }, []);
+
+  const removeScheduled = useCallback((date: string) => {
+    setScheduled(prev => prev.filter(s => s.date !== date));
+  }, []);
+
+  return { scheduled, scheduleWorkout, removeScheduled };
+}
+
+export function useUserProfile() {
+  const [profile, setProfile] = useState<UserProfile>({
+    goalType: 'maintain',
+    activityLevel: 'moderate',
+    calorieTarget: 2200,
+    proteinTarget: 160,
+    carbsTarget: 250,
+    fatTarget: 70,
+  });
+
+  const updateProfile = useCallback((updates: Partial<UserProfile>) => {
+    setProfile(prev => ({ ...prev, ...updates }));
+  }, []);
+
+  return { profile, updateProfile };
 }
 
 export function useWorkouts() {
