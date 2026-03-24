@@ -1,7 +1,7 @@
-import { Home, Utensils, Ruler, Dumbbell, Trophy } from 'lucide-react';
+import { Home, Utensils, Ruler, Dumbbell, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-export type TabId = 'home' | 'meals' | 'body' | 'workout' | 'progress';
+export type TabId = 'home' | 'meals' | 'body' | 'workout' | 'settings';
 
 interface BottomTabBarProps {
   activeTab: TabId;
@@ -13,7 +13,7 @@ const tabs: { id: TabId; label: string; icon: typeof Home }[] = [
   { id: 'meals', label: 'Posiłki', icon: Utensils },
   { id: 'body', label: 'Ciało', icon: Ruler },
   { id: 'workout', label: 'Trening', icon: Dumbbell },
-  { id: 'progress', label: 'Progres', icon: Trophy },
+  { id: 'settings', label: 'Ustawienia', icon: Settings },
 ];
 
 export default function BottomTabBar({ activeTab, onTabChange }: BottomTabBarProps) {

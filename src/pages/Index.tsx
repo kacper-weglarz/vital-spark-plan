@@ -4,25 +4,37 @@ import HomePage from '@/pages/HomePage';
 import MealsPage from '@/pages/MealsPage';
 import BodyPage from '@/pages/BodyPage';
 import WorkoutPage from '@/pages/WorkoutPage';
-import ProgressPage from '@/pages/ProgressPage';
+import SettingsPage from '@/pages/SettingsPage';
 import {
   useMealEntries,
-  useUserGoals,
   useBodyMeasurements,
   useWorkouts,
   useStreak,
+  useTrainingPlans,
+  useScheduledWorkouts,
+  useUserProfile,
 } from '@/lib/store';
 
 export default function Index() {
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const { entries, addEntry, removeEntry, getDailyTotals } = useMealEntries();
-  const { goals } = useUserGoals();
+  const { profile, updateProfile } = useUserProfile();
   const { measurements, addMeasurement } = useBodyMeasurements();
   const { workouts, addWorkout } = useWorkouts();
   const { streak } = useStreak();
+  const { plans, addPlan, updatePlan, removePlan } = useTrainingPlans();
+  const { scheduled, scheduleWorkout, removeScheduled } = useScheduledWorkouts();
 
   const today = new Date().toISOString().split('T')[0];
   const dailyTotals = getDailyTotals(today);
+
+  const goals = {
+    calorieTarget: profile.calorieTarget,
+    proteinTarget: profile.proteinTarget,
+    carbsTarget: profile.carbsTarget,
+    fatTarget: profile.fatTarget,
+    goalType: profile.goalType,
+  };
 
   const handleAddFood = (foodItem: any, quantity: number, mealType: any) => {
     addEntry({ foodItem, quantity, mealType, date: today });
@@ -37,9 +49,9 @@ export default function Index() {
       case 'body':
         return <BodyPage measurements={measurements} onAdd={addMeasurement} />;
       case 'workout':
-        return <WorkoutPage workouts={workouts} onAdd={addWorkout} />;
-      case 'progress':
-        return <ProgressPage streak={streak} workoutCount={workouts.length} />;
+        return <WorkoutPage workouts={workouts} onAdd={addWorkout} plans={plans} onAddPlan={addPlan} onUpdatePlan={updatePlan} onRemovePlan={removePlan} scheduled={scheduled} onSchedule={scheduleWorkout} onRemoveSchedule={removeScheduled} />;
+      case 'settings':
+        return <SettingsPage profile={profile} onUpdate={updateProfile} />;
       default:
         return null;
     }
@@ -55,9 +67,9 @@ export default function Index() {
             </div>
             <span className="text-base font-bold">FitTracker</span>
           </div>
-          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+          <button onClick={() => setActiveTab('settings')} className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
             <span className="text-sm">👤</span>
-          </div>
+          </button>
         </div>
       </div>
       {renderPage()}

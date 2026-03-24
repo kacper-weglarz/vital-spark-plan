@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, TrendingDown, Scale } from 'lucide-react';
+import { Plus, X, TrendingDown, Scale, ChevronLeft } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { BodyMeasurement } from '@/lib/store';
 
@@ -12,29 +12,124 @@ interface BodyPageProps {
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
 
+type MeasurementKey = 'weight' | 'waist' | 'belly' | 'chest' | 'bicepLeft' | 'bicepRight' | 'thighLeft' | 'thighRight' | 'calfLeft' | 'calfRight' | 'hips';
+
+const MEASUREMENT_CONFIG: { key: MeasurementKey; label: string; unit: string; paired?: MeasurementKey }[] = [
+  { key: 'weight', label: 'Waga', unit: 'kg' },
+  { key: 'waist', label: 'Talia', unit: 'cm' },
+  { key: 'belly', label: 'Brzuch', unit: 'cm' },
+  { key: 'chest', label: 'Klatka', unit: 'cm' },
+  { key: 'hips', label: 'Biodra', unit: 'cm' },
+  { key: 'bicepLeft', label: 'Biceps L', unit: 'cm', paired: 'bicepRight' },
+  { key: 'thighLeft', label: 'Udo L', unit: 'cm', paired: 'thighRight' },
+  { key: 'calfLeft', label: 'Łydka L', unit: 'cm', paired: 'calfRight' },
+];
+
+const FORM_FIELDS: { key: string; label: string; placeholder: string }[] = [
+  { key: 'weight', label: 'Waga (kg)', placeholder: '80.5' },
+  { key: 'waist', label: 'Talia (cm)', placeholder: '82' },
+  { key: 'belly', label: 'Brzuch (cm)', placeholder: '86' },
+  { key: 'chest', label: 'Klatka (cm)', placeholder: '103' },
+  { key: 'hips', label: 'Biodra (cm)', placeholder: '96' },
+  { key: 'bicepLeft', label: 'Biceps L (cm)', placeholder: '37' },
+  { key: 'bicepRight', label: 'Biceps P (cm)', placeholder: '37.5' },
+  { key: 'thighLeft', label: 'Udo L (cm)', placeholder: '58' },
+  { key: 'thighRight', label: 'Udo P (cm)', placeholder: '59' },
+  { key: 'calfLeft', label: 'Łydka L (cm)', placeholder: '37' },
+  { key: 'calfRight', label: 'Łydka P (cm)', placeholder: '37.5' },
+];
+
 export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ weight: '', waist: '', chest: '', hips: '', bicepLeft: '', bicepRight: '' });
+  const [chartKey, setChartKey] = useState<MeasurementKey | null>(null);
+  const [form, setForm] = useState<Record<string, string>>({});
 
   const sorted = [...measurements].sort((a, b) => a.date.localeCompare(b.date));
-  const weightData = sorted.filter(m => m.weight).map(m => ({ date: m.date.slice(5), weight: m.weight }));
   const latest = sorted[sorted.length - 1];
   const previous = sorted[sorted.length - 2];
   const weightDiff = latest?.weight && previous?.weight ? latest.weight - previous.weight : 0;
 
+  const getChartData = (key: MeasurementKey) => {
+    return sorted.filter(m => m[key] != null).map(m => ({
+      date: m.date.slice(5),
+      value: m[key],
+    }));
+  };
+
+  const getPairedDisplay = (cfg: typeof MEASUREMENT_CONFIG[0]) => {
+    if (cfg.paired && latest) {
+      const l = latest[cfg.key];
+      const r = latest[cfg.paired];
+      if (l != null && r != null) return `${l}/${r}`;
+      if (l != null) return String(l);
+    }
+    return latest?.[cfg.key] != null ? String(latest[cfg.key]) : '—';
+  };
+
   const handleSubmit = () => {
-    onAdd({
+    const entry: Omit<BodyMeasurement, 'id'> = {
       date: new Date().toISOString().split('T')[0],
-      weight: form.weight ? Number(form.weight) : undefined,
-      waist: form.waist ? Number(form.waist) : undefined,
-      chest: form.chest ? Number(form.chest) : undefined,
-      hips: form.hips ? Number(form.hips) : undefined,
-      bicepLeft: form.bicepLeft ? Number(form.bicepLeft) : undefined,
-      bicepRight: form.bicepRight ? Number(form.bicepRight) : undefined,
+    };
+    FORM_FIELDS.forEach(f => {
+      if (form[f.key]) (entry as any)[f.key] = Number(form[f.key]);
     });
-    setForm({ weight: '', waist: '', chest: '', hips: '', bicepLeft: '', bicepRight: '' });
+    onAdd(entry);
+    setForm({});
     setShowForm(false);
   };
+
+  // Detail chart view
+  if (chartKey) {
+    const cfg = MEASUREMENT_CONFIG.find(c => c.key === chartKey)!;
+    const data = getChartData(chartKey);
+    const pairedData = cfg.paired ? getChartData(cfg.paired) : null;
+
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-4 pt-2 pb-28">
+        <button onClick={() => setChartKey(null)} className="flex items-center gap-1 text-sm font-semibold text-primary mb-4">
+          <ChevronLeft className="w-4 h-4" /> Powrót
+        </button>
+        <h2 className="text-xl font-bold mb-1">{cfg.label}</h2>
+        <p className="text-sm text-muted-foreground mb-4">Historia zmian ({cfg.unit})</p>
+        <div className="ios-card p-4">
+          <div className="h-52">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data}>
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickLine={false} axisLine={false} />
+                <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickLine={false} axisLine={false} width={35} />
+                <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: 12 }} />
+                <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ fill: 'hsl(var(--primary))', r: 4 }} name={cfg.label} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          {pairedData && pairedData.length > 1 && (
+            <div className="h-52 mt-4">
+              <p className="text-xs font-semibold text-muted-foreground mb-2">{cfg.label.replace(' L', ' P')}</p>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={pairedData}>
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickLine={false} axisLine={false} />
+                  <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickLine={false} axisLine={false} width={35} />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: 12 }} />
+                  <Line type="monotone" dataKey="value" stroke="hsl(var(--accent))" strokeWidth={2.5} dot={{ fill: 'hsl(var(--accent))', r: 4 }} name={cfg.label.replace(' L', ' P')} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+        {/* History table */}
+        <div className="mt-4 space-y-2">
+          {sorted.slice().reverse().map(m => (
+            <div key={m.id} className="ios-card p-3 flex items-center justify-between">
+              <span className="text-sm font-semibold">{new Date(m.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}</span>
+              <span className="text-sm font-bold text-primary">
+                {cfg.paired ? `${m[cfg.key] ?? '—'} / ${m[cfg.paired] ?? '—'}` : `${m[chartKey] ?? '—'}`} {cfg.unit}
+              </span>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="px-4 pt-2 pb-28">
@@ -49,8 +144,8 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
       </motion.div>
 
       {/* Weight Overview */}
-      <motion.div variants={item} className="ios-card p-5 mb-4">
-        <div className="flex items-center gap-3 mb-4">
+      <motion.div variants={item} className="ios-card p-5 mb-4" onClick={() => setChartKey('weight')}>
+        <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
             <Scale className="w-5 h-5 text-primary" />
           </div>
@@ -65,32 +160,21 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
             </div>
           )}
         </div>
-        {weightData.length > 1 && (
-          <div className="h-36">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={weightData}>
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickLine={false} axisLine={false} />
-                <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickLine={false} axisLine={false} width={30} />
-                <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: 12 }} />
-                <Line type="monotone" dataKey="weight" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ fill: 'hsl(var(--primary))', r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+        <p className="text-[10px] text-muted-foreground">Kliknij, aby zobaczyć wykres →</p>
       </motion.div>
 
       {/* Measurements grid */}
       <motion.div variants={item} className="grid grid-cols-2 gap-3 mb-4">
-        {[
-          { label: 'Talia', value: latest?.waist, unit: 'cm' },
-          { label: 'Klatka', value: latest?.chest, unit: 'cm' },
-          { label: 'Biodra', value: latest?.hips, unit: 'cm' },
-          { label: 'Biceps L/P', value: latest?.bicepLeft && latest?.bicepRight ? `${latest.bicepLeft}/${latest.bicepRight}` : undefined, unit: 'cm' },
-        ].map((m, i) => (
-          <div key={i} className="ios-card p-4">
-            <p className="text-xs text-muted-foreground mb-1">{m.label}</p>
-            <p className="text-xl font-bold">{m.value ?? '—'} <span className="text-xs font-normal text-muted-foreground">{m.unit}</span></p>
-          </div>
+        {MEASUREMENT_CONFIG.filter(c => c.key !== 'weight').map((cfg) => (
+          <button
+            key={cfg.key}
+            onClick={() => setChartKey(cfg.key)}
+            className="ios-card p-4 text-left active:scale-[0.97] transition-transform"
+          >
+            <p className="text-xs text-muted-foreground mb-1">{cfg.label}{cfg.paired ? '/P' : ''}</p>
+            <p className="text-xl font-bold">{getPairedDisplay(cfg)} <span className="text-xs font-normal text-muted-foreground">{cfg.unit}</span></p>
+            <p className="text-[10px] text-primary mt-1">Zobacz wykres →</p>
+          </button>
         ))}
       </motion.div>
 
@@ -102,7 +186,7 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
             <div key={m.id} className="ios-card p-3.5 flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold">{new Date(m.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}</p>
-                <p className="text-xs text-muted-foreground">{m.weight}kg • T:{m.waist}cm • Kl:{m.chest}cm</p>
+                <p className="text-xs text-muted-foreground">{m.weight}kg • T:{m.waist}cm • Br:{m.belly}cm • Kl:{m.chest}cm</p>
               </div>
             </div>
           ))}
@@ -117,28 +201,21 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
             <motion.div
               initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-5"
+              className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold">Nowy pomiar</h3>
                 <button onClick={() => setShowForm(false)} className="p-1 rounded-full bg-muted"><X className="w-5 h-5" /></button>
               </div>
               <div className="grid grid-cols-2 gap-3 mb-4">
-                {[
-                  { key: 'weight', label: 'Waga (kg)', placeholder: '80.5' },
-                  { key: 'waist', label: 'Talia (cm)', placeholder: '82' },
-                  { key: 'chest', label: 'Klatka (cm)', placeholder: '103' },
-                  { key: 'hips', label: 'Biodra (cm)', placeholder: '96' },
-                  { key: 'bicepLeft', label: 'Biceps L (cm)', placeholder: '37' },
-                  { key: 'bicepRight', label: 'Biceps P (cm)', placeholder: '37.5' },
-                ].map(f => (
+                {FORM_FIELDS.map(f => (
                   <div key={f.key}>
                     <label className="text-xs font-semibold text-muted-foreground mb-1 block">{f.label}</label>
                     <input
                       type="number"
                       step="0.1"
                       placeholder={f.placeholder}
-                      value={form[f.key as keyof typeof form]}
+                      value={form[f.key] || ''}
                       onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
                       className="w-full px-3 py-2.5 bg-muted rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
