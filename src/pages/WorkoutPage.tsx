@@ -1,16 +1,31 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, RotateCcw, Clock, ChevronRight, ChevronLeft, Plus, X, Check, Trash2, Calendar, Edit3 } from 'lucide-react';
-import { Workout, TrainingPlan, PlanExercise, ExerciseSet, ScheduledWorkout } from '@/lib/store';
+import { PlanExercise, ExerciseSet } from '@/lib/store';
+
+interface DBWorkout {
+  id: string;
+  name: string;
+  date: string;
+  duration: number;
+  completed: boolean;
+  [key: string]: any;
+}
+
+interface WorkoutPlan {
+  id: string;
+  name: string;
+  exercises: PlanExercise[];
+}
 
 interface WorkoutPageProps {
-  workouts: Workout[];
-  onAdd: (w: Omit<Workout, 'id'>) => void;
-  plans: TrainingPlan[];
-  onAddPlan: (p: Omit<TrainingPlan, 'id'>) => void;
-  onUpdatePlan: (id: string, p: Partial<TrainingPlan>) => void;
+  workouts: DBWorkout[];
+  onAdd: (w: any) => void;
+  plans: WorkoutPlan[];
+  onAddPlan: (p: any) => void;
+  onUpdatePlan: (id: string, p: any) => void;
   onRemovePlan: (id: string) => void;
-  scheduled: ScheduledWorkout[];
+  scheduled: { date: string; planId: string }[];
   onSchedule: (date: string, planId: string) => void;
   onRemoveSchedule: (date: string) => void;
 }
@@ -68,7 +83,7 @@ type ViewMode = 'main' | 'plan-editor' | 'active-workout' | 'calendar';
 
 export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdatePlan, onRemovePlan, scheduled, onSchedule, onRemoveSchedule }: WorkoutPageProps) {
   const [view, setView] = useState<ViewMode>('main');
-  const [editingPlan, setEditingPlan] = useState<TrainingPlan | null>(null);
+  const [editingPlan, setEditingPlan] = useState<WorkoutPlan | null>(null);
   const [planName, setPlanName] = useState('');
   const [planExercises, setPlanExercises] = useState<PlanExercise[]>([]);
   const [activeWorkout, setActiveWorkout] = useState<{ name: string; exercises: { name: string; sets: ExerciseSet[] }[] } | null>(null);
@@ -82,7 +97,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
     setView('plan-editor');
   };
 
-  const openEditPlan = (plan: TrainingPlan) => {
+  const openEditPlan = (plan: WorkoutPlan) => {
     setEditingPlan(plan);
     setPlanName(plan.name);
     setPlanExercises([...plan.exercises]);
@@ -111,7 +126,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
     setView('main');
   };
 
-  const startPlan = (plan: TrainingPlan) => {
+  const startPlan = (plan: WorkoutPlan) => {
     setActiveWorkout({
       name: plan.name,
       exercises: plan.exercises.map(e => ({
