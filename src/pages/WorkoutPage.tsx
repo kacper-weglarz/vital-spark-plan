@@ -1,16 +1,31 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, RotateCcw, Clock, ChevronRight, ChevronLeft, Plus, X, Check, Trash2, Calendar, Edit3 } from 'lucide-react';
-import { Workout, TrainingPlan, PlanExercise, ExerciseSet, ScheduledWorkout } from '@/lib/store';
+import { PlanExercise, ExerciseSet } from '@/lib/store';
+
+interface DBWorkout {
+  id: string;
+  name: string;
+  date: string;
+  duration: number;
+  completed: boolean;
+  [key: string]: any;
+}
+
+interface WorkoutPlan {
+  id: string;
+  name: string;
+  exercises: PlanExercise[];
+}
 
 interface WorkoutPageProps {
-  workouts: Workout[];
-  onAdd: (w: Omit<Workout, 'id'>) => void;
-  plans: TrainingPlan[];
-  onAddPlan: (p: Omit<TrainingPlan, 'id'>) => void;
-  onUpdatePlan: (id: string, p: Partial<TrainingPlan>) => void;
+  workouts: DBWorkout[];
+  onAdd: (w: any) => void;
+  plans: WorkoutPlan[];
+  onAddPlan: (p: any) => void;
+  onUpdatePlan: (id: string, p: any) => void;
   onRemovePlan: (id: string) => void;
-  scheduled: ScheduledWorkout[];
+  scheduled: { date: string; planId: string }[];
   onSchedule: (date: string, planId: string) => void;
   onRemoveSchedule: (date: string) => void;
 }
