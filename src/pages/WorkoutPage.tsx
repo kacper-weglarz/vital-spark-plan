@@ -83,7 +83,7 @@ type ViewMode = 'main' | 'plan-editor' | 'active-workout' | 'calendar';
 
 export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdatePlan, onRemovePlan, scheduled, onSchedule, onRemoveSchedule }: WorkoutPageProps) {
   const [view, setView] = useState<ViewMode>('main');
-  const [editingPlan, setEditingPlan] = useState<TrainingPlan | null>(null);
+  const [editingPlan, setEditingPlan] = useState<WorkoutPlan | null>(null);
   const [planName, setPlanName] = useState('');
   const [planExercises, setPlanExercises] = useState<PlanExercise[]>([]);
   const [activeWorkout, setActiveWorkout] = useState<{ name: string; exercises: { name: string; sets: ExerciseSet[] }[] } | null>(null);
@@ -97,7 +97,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
     setView('plan-editor');
   };
 
-  const openEditPlan = (plan: TrainingPlan) => {
+  const openEditPlan = (plan: WorkoutPlan) => {
     setEditingPlan(plan);
     setPlanName(plan.name);
     setPlanExercises([...plan.exercises]);
@@ -126,7 +126,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
     setView('main');
   };
 
-  const startPlan = (plan: TrainingPlan) => {
+  const startPlan = (plan: WorkoutPlan) => {
     setActiveWorkout({
       name: plan.name,
       exercises: plan.exercises.map(e => ({
