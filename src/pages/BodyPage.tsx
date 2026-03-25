@@ -2,17 +2,16 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X, TrendingDown, Scale, ChevronLeft } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
-import { BodyMeasurement } from '@/lib/store';
 
 interface BodyPageProps {
-  measurements: BodyMeasurement[];
-  onAdd: (m: Omit<BodyMeasurement, 'id'>) => void;
+  measurements: any[];
+  onAdd: (m: Record<string, any>) => void;
 }
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
 
-type MeasurementKey = 'weight' | 'waist' | 'belly' | 'chest' | 'bicepLeft' | 'bicepRight' | 'thighLeft' | 'thighRight' | 'calfLeft' | 'calfRight' | 'hips';
+type MeasurementKey = 'weight' | 'waist' | 'belly' | 'chest' | 'bicep_left' | 'bicep_right' | 'thigh_left' | 'thigh_right' | 'calf_left' | 'calf_right' | 'hips';
 
 const MEASUREMENT_CONFIG: { key: MeasurementKey; label: string; unit: string; paired?: MeasurementKey }[] = [
   { key: 'weight', label: 'Waga', unit: 'kg' },
@@ -20,9 +19,9 @@ const MEASUREMENT_CONFIG: { key: MeasurementKey; label: string; unit: string; pa
   { key: 'belly', label: 'Brzuch', unit: 'cm' },
   { key: 'chest', label: 'Klatka', unit: 'cm' },
   { key: 'hips', label: 'Biodra', unit: 'cm' },
-  { key: 'bicepLeft', label: 'Biceps L', unit: 'cm', paired: 'bicepRight' },
-  { key: 'thighLeft', label: 'Udo L', unit: 'cm', paired: 'thighRight' },
-  { key: 'calfLeft', label: 'Łydka L', unit: 'cm', paired: 'calfRight' },
+  { key: 'bicep_left', label: 'Biceps L', unit: 'cm', paired: 'bicep_right' },
+  { key: 'thigh_left', label: 'Udo L', unit: 'cm', paired: 'thigh_right' },
+  { key: 'calf_left', label: 'Łydka L', unit: 'cm', paired: 'calf_right' },
 ];
 
 const FORM_FIELDS: { key: string; label: string; placeholder: string }[] = [
@@ -31,12 +30,12 @@ const FORM_FIELDS: { key: string; label: string; placeholder: string }[] = [
   { key: 'belly', label: 'Brzuch (cm)', placeholder: '86' },
   { key: 'chest', label: 'Klatka (cm)', placeholder: '103' },
   { key: 'hips', label: 'Biodra (cm)', placeholder: '96' },
-  { key: 'bicepLeft', label: 'Biceps L (cm)', placeholder: '37' },
-  { key: 'bicepRight', label: 'Biceps P (cm)', placeholder: '37.5' },
-  { key: 'thighLeft', label: 'Udo L (cm)', placeholder: '58' },
-  { key: 'thighRight', label: 'Udo P (cm)', placeholder: '59' },
-  { key: 'calfLeft', label: 'Łydka L (cm)', placeholder: '37' },
-  { key: 'calfRight', label: 'Łydka P (cm)', placeholder: '37.5' },
+  { key: 'bicep_left', label: 'Biceps L (cm)', placeholder: '37' },
+  { key: 'bicep_right', label: 'Biceps P (cm)', placeholder: '37.5' },
+  { key: 'thigh_left', label: 'Udo L (cm)', placeholder: '58' },
+  { key: 'thigh_right', label: 'Udo P (cm)', placeholder: '59' },
+  { key: 'calf_left', label: 'Łydka L (cm)', placeholder: '37' },
+  { key: 'calf_right', label: 'Łydka P (cm)', placeholder: '37.5' },
 ];
 
 export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
@@ -47,14 +46,10 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
   const sorted = [...measurements].sort((a, b) => a.date.localeCompare(b.date));
   const latest = sorted[sorted.length - 1];
   const previous = sorted[sorted.length - 2];
-  const weightDiff = latest?.weight && previous?.weight ? latest.weight - previous.weight : 0;
+  const weightDiff = latest?.weight && previous?.weight ? Number(latest.weight) - Number(previous.weight) : 0;
 
-  const getChartData = (key: MeasurementKey) => {
-    return sorted.filter(m => m[key] != null).map(m => ({
-      date: m.date.slice(5),
-      value: m[key],
-    }));
-  };
+  const getChartData = (key: MeasurementKey) =>
+    sorted.filter(m => m[key] != null).map(m => ({ date: m.date.slice(5), value: Number(m[key]) }));
 
   const getPairedDisplay = (cfg: typeof MEASUREMENT_CONFIG[0]) => {
     if (cfg.paired && latest) {
@@ -67,18 +62,15 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
   };
 
   const handleSubmit = () => {
-    const entry: Omit<BodyMeasurement, 'id'> = {
-      date: new Date().toISOString().split('T')[0],
-    };
+    const entry: Record<string, any> = { date: new Date().toISOString().split('T')[0] };
     FORM_FIELDS.forEach(f => {
-      if (form[f.key]) (entry as any)[f.key] = Number(form[f.key]);
+      if (form[f.key]) entry[f.key] = Number(form[f.key]);
     });
     onAdd(entry);
     setForm({});
     setShowForm(false);
   };
 
-  // Detail chart view
   if (chartKey) {
     const cfg = MEASUREMENT_CONFIG.find(c => c.key === chartKey)!;
     const data = getChartData(chartKey);
@@ -116,7 +108,6 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
             </div>
           )}
         </div>
-        {/* History table */}
         <div className="mt-4 space-y-2">
           {sorted.slice().reverse().map(m => (
             <div key={m.id} className="ios-card p-3 flex items-center justify-between">
@@ -143,7 +134,6 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
         </button>
       </motion.div>
 
-      {/* Weight Overview */}
       <motion.div variants={item} className="ios-card p-5 mb-4" onClick={() => setChartKey('weight')}>
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -163,14 +153,9 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
         <p className="text-[10px] text-muted-foreground">Kliknij, aby zobaczyć wykres →</p>
       </motion.div>
 
-      {/* Measurements grid */}
       <motion.div variants={item} className="grid grid-cols-2 gap-3 mb-4">
-        {MEASUREMENT_CONFIG.filter(c => c.key !== 'weight').map((cfg) => (
-          <button
-            key={cfg.key}
-            onClick={() => setChartKey(cfg.key)}
-            className="ios-card p-4 text-left active:scale-[0.97] transition-transform"
-          >
+        {MEASUREMENT_CONFIG.filter(c => c.key !== 'weight').map(cfg => (
+          <button key={cfg.key} onClick={() => setChartKey(cfg.key)} className="ios-card p-4 text-left active:scale-[0.97] transition-transform">
             <p className="text-xs text-muted-foreground mb-1">{cfg.label}{cfg.paired ? '/P' : ''}</p>
             <p className="text-xl font-bold">{getPairedDisplay(cfg)} <span className="text-xs font-normal text-muted-foreground">{cfg.unit}</span></p>
             <p className="text-[10px] text-primary mt-1">Zobacz wykres →</p>
@@ -178,7 +163,6 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
         ))}
       </motion.div>
 
-      {/* History */}
       <motion.div variants={item}>
         <h3 className="ios-section-title mb-2">Historia pomiarów</h3>
         <div className="space-y-2">
@@ -193,16 +177,13 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
         </div>
       </motion.div>
 
-      {/* Add Form Sheet */}
       <AnimatePresence>
         {showForm && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-foreground/20 z-50" onClick={() => setShowForm(false)} />
-            <motion.div
-              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto"
-            >
+              className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold">Nowy pomiar</h3>
                 <button onClick={() => setShowForm(false)} className="p-1 rounded-full bg-muted"><X className="w-5 h-5" /></button>
@@ -211,20 +192,13 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
                 {FORM_FIELDS.map(f => (
                   <div key={f.key}>
                     <label className="text-xs font-semibold text-muted-foreground mb-1 block">{f.label}</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      placeholder={f.placeholder}
-                      value={form[f.key] || ''}
+                    <input type="number" step="0.1" placeholder={f.placeholder} value={form[f.key] || ''}
                       onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                      className="w-full px-3 py-2.5 bg-muted rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
+                      className="w-full px-3 py-2.5 bg-muted rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30" />
                   </div>
                 ))}
               </div>
-              <button onClick={handleSubmit} className="w-full py-3.5 bg-primary rounded-2xl text-primary-foreground font-bold">
-                Zapisz pomiar
-              </button>
+              <button onClick={handleSubmit} className="w-full py-3.5 bg-primary rounded-2xl text-primary-foreground font-bold">Zapisz pomiar</button>
             </motion.div>
           </>
         )}
