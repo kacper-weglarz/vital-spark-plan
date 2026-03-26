@@ -3,29 +3,37 @@ import { motion } from 'framer-motion';
 import { Plus, Trash2 } from 'lucide-react';
 import CalorieRing from '@/components/CalorieRing';
 import AddFoodSheet from '@/components/AddFoodSheet';
-import { MealType, MEAL_LABELS, MEAL_ICONS, UserGoals } from '@/lib/store';
+import { UserGoals } from '@/lib/store';
+import { ProfileInput } from '@/lib/calculator';
+import { getMealSchedule, MealEntry, Product } from '@/lib/local-storage';
 
 interface MealsPageProps {
-  meals: any[];
+  meals: MealEntry[];
   dailyTotals: { calories: number; protein: number; carbs: number; fat: number };
   goals: UserGoals;
-  onAdd: (product: any, quantity: number, mealType: string) => void;
+  onAdd: (product: Product, quantity: number, unit: string, mealType: string) => void;
   onRemove: (id: string) => void;
+  profile: ProfileInput;
 }
 
-const mealTypes: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
 
-export default function MealsPage({ meals, dailyTotals, goals, onAdd, onRemove }: MealsPageProps) {
+const MEAL_EMOJIS: Record<number, string> = { 0: '🌅', 1: '🥪', 2: '☀️', 3: '🌙', 4: '🍎', 5: '🥗' };
+
+export default function MealsPage({ meals, dailyTotals, goals, onAdd, onRemove, profile }: MealsPageProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [activeMeal, setActiveMeal] = useState<MealType>('breakfast');
+  const [activeMealType, setActiveMealType] = useState('meal_0');
+  const [activeMealLabel, setActiveMealLabel] = useState('Posiłek');
 
-  const getMealCalories = (type: MealType) =>
-    meals.filter(m => m.meal_type === type).reduce((sum, m) => sum + Number(m.calories), 0);
+  const mealSlots = getMealSchedule(profile.mealsPerDay);
 
-  const openSheet = (type: MealType) => {
-    setActiveMeal(type);
+  const getMealCalories = (type: string) =>
+    meals.filter(m => m.meal_type === type).reduce((sum, m) => sum + m.calories, 0);
+
+  const openSheet = (type: string, label: string) => {
+    setActiveMealType(type);
+    setActiveMealLabel(label);
     setSheetOpen(true);
   };
 
@@ -54,20 +62,21 @@ export default function MealsPage({ meals, dailyTotals, goals, onAdd, onRemove }
         </div>
       </motion.div>
 
-      {mealTypes.map(type => {
+      {mealSlots.map((slot, i) => {
+        const type = `meal_${i}`;
         const mealEntries = meals.filter(m => m.meal_type === type);
         const mealCals = getMealCalories(type);
         return (
           <motion.div key={type} variants={item} className="ios-card p-4 mb-3">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <span className="text-lg">{MEAL_ICONS[type]}</span>
+                <span className="text-lg">{MEAL_EMOJIS[i] || '🍽️'}</span>
                 <div>
-                  <h3 className="text-sm font-bold">{MEAL_LABELS[type]}</h3>
-                  <p className="text-xs text-muted-foreground">{Math.round(mealCals)} kcal</p>
+                  <h3 className="text-sm font-bold">{slot.label}</h3>
+                  <p className="text-xs text-muted-foreground">{slot.time} • {Math.round(mealCals)} kcal</p>
                 </div>
               </div>
-              <button onClick={() => openSheet(type)} className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center active:scale-90 transition-transform">
+              <button onClick={() => openSheet(type, slot.label)} className="w-10 h-10 bg-primary/10 rounded-2xl flex items-center justify-center active:scale-90 transition-transform min-w-[44px] min-h-[44px]">
                 <Plus className="w-4 h-4 text-primary" />
               </button>
             </div>
@@ -84,7 +93,7 @@ export default function MealsPage({ meals, dailyTotals, goals, onAdd, onRemove }
                       <span className="macro-carbs">{Math.round(entry.carbs)}W</span>
                       <span className="macro-fat">{Math.round(entry.fat)}T</span>
                     </div>
-                    <button onClick={() => onRemove(entry.id)} className="p-1 text-muted-foreground hover:text-destructive">
+                    <button onClick={() => onRemove(entry.id)} className="p-2 text-muted-foreground hover:text-destructive min-w-[44px] min-h-[44px] flex items-center justify-center">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -97,7 +106,7 @@ export default function MealsPage({ meals, dailyTotals, goals, onAdd, onRemove }
         );
       })}
 
-      <AddFoodSheet isOpen={sheetOpen} onClose={() => setSheetOpen(false)} mealType={activeMeal} onAdd={onAdd} />
+      <AddFoodSheet isOpen={sheetOpen} onClose={() => setSheetOpen(false)} mealType={activeMealType} mealLabel={activeMealLabel} onAdd={onAdd} />
     </motion.div>
   );
 }

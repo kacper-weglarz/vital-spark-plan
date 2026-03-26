@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, TrendingDown, Scale, ChevronLeft } from 'lucide-react';
+import { Plus, X, TrendingDown, Scale, ChevronLeft, Save } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import { BodyMeasurement } from '@/lib/local-storage';
 
 interface BodyPageProps {
-  measurements: any[];
+  measurements: BodyMeasurement[];
   onAdd: (m: Record<string, any>) => void;
 }
 
@@ -43,29 +44,35 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
   const [chartKey, setChartKey] = useState<MeasurementKey | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
 
-  const sorted = [...measurements].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = [...measurements].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const latest = sorted[sorted.length - 1];
   const previous = sorted[sorted.length - 2];
-  const weightDiff = latest?.weight && previous?.weight ? Number(latest.weight) - Number(previous.weight) : 0;
+  const weightDiff = latest?.weight && previous?.weight ? latest.weight - previous.weight : 0;
 
   const getChartData = (key: MeasurementKey) =>
-    sorted.filter(m => m[key] != null).map(m => ({ date: m.date.slice(5), value: Number(m[key]) }));
+    sorted.filter(m => (m as any)[key] != null).map(m => ({ date: (m.date || '').slice(5), value: Number((m as any)[key]) }));
 
   const getPairedDisplay = (cfg: typeof MEASUREMENT_CONFIG[0]) => {
-    if (cfg.paired && latest) {
-      const l = latest[cfg.key];
-      const r = latest[cfg.paired];
+    if (!latest) return '—';
+    if (cfg.paired) {
+      const l = (latest as any)[cfg.key];
+      const r = (latest as any)[cfg.paired];
       if (l != null && r != null) return `${l}/${r}`;
       if (l != null) return String(l);
     }
-    return latest?.[cfg.key] != null ? String(latest[cfg.key]) : '—';
+    return (latest as any)[cfg.key] != null ? String((latest as any)[cfg.key]) : '—';
   };
 
   const handleSubmit = () => {
     const entry: Record<string, any> = { date: new Date().toISOString().split('T')[0] };
+    let hasValue = false;
     FORM_FIELDS.forEach(f => {
-      if (form[f.key]) entry[f.key] = Number(form[f.key]);
+      if (form[f.key]) {
+        entry[f.key] = Number(form[f.key]);
+        hasValue = true;
+      }
     });
+    if (!hasValue) return;
     onAdd(entry);
     setForm({});
     setShowForm(false);
@@ -78,7 +85,7 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
 
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-4 pt-2 pb-28">
-        <button onClick={() => setChartKey(null)} className="flex items-center gap-1 text-sm font-semibold text-primary mb-4">
+        <button onClick={() => setChartKey(null)} className="flex items-center gap-1 text-sm font-semibold text-primary mb-4 min-h-[44px]">
           <ChevronLeft className="w-4 h-4" /> Powrót
         </button>
         <h2 className="text-xl font-bold mb-1">{cfg.label}</h2>
@@ -113,7 +120,7 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
             <div key={m.id} className="ios-card p-3 flex items-center justify-between">
               <span className="text-sm font-semibold">{new Date(m.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}</span>
               <span className="text-sm font-bold text-primary">
-                {cfg.paired ? `${m[cfg.key] ?? '—'} / ${m[cfg.paired] ?? '—'}` : `${m[chartKey] ?? '—'}`} {cfg.unit}
+                {cfg.paired ? `${(m as any)[cfg.key] ?? '—'} / ${(m as any)[cfg.paired] ?? '—'}` : `${(m as any)[chartKey] ?? '—'}`} {cfg.unit}
               </span>
             </div>
           ))}
@@ -129,7 +136,7 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
           <h1 className="text-2xl font-bold">Pomiary ciała</h1>
           <p className="text-sm text-muted-foreground">Monitoruj swoje postępy</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="w-10 h-10 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
+        <button onClick={() => setShowForm(!showForm)} className="w-10 h-10 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25 min-w-[44px] min-h-[44px]">
           <Plus className="w-5 h-5 text-primary-foreground" />
         </button>
       </motion.div>
@@ -155,7 +162,7 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
 
       <motion.div variants={item} className="grid grid-cols-2 gap-3 mb-4">
         {MEASUREMENT_CONFIG.filter(c => c.key !== 'weight').map(cfg => (
-          <button key={cfg.key} onClick={() => setChartKey(cfg.key)} className="ios-card p-4 text-left active:scale-[0.97] transition-transform">
+          <button key={cfg.key} onClick={() => setChartKey(cfg.key)} className="ios-card p-4 text-left active:scale-[0.97] transition-transform min-h-[44px]">
             <p className="text-xs text-muted-foreground mb-1">{cfg.label}{cfg.paired ? '/P' : ''}</p>
             <p className="text-xl font-bold">{getPairedDisplay(cfg)} <span className="text-xs font-normal text-muted-foreground">{cfg.unit}</span></p>
             <p className="text-[10px] text-primary mt-1">Zobacz wykres →</p>
@@ -186,7 +193,7 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
               className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold">Nowy pomiar</h3>
-                <button onClick={() => setShowForm(false)} className="p-1 rounded-full bg-muted"><X className="w-5 h-5" /></button>
+                <button onClick={() => setShowForm(false)} className="p-2 rounded-full bg-muted min-w-[44px] min-h-[44px] flex items-center justify-center"><X className="w-5 h-5" /></button>
               </div>
               <div className="grid grid-cols-2 gap-3 mb-4">
                 {FORM_FIELDS.map(f => (
@@ -198,7 +205,9 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
                   </div>
                 ))}
               </div>
-              <button onClick={handleSubmit} className="w-full py-3.5 bg-primary rounded-2xl text-primary-foreground font-bold">Zapisz pomiar</button>
+              <button onClick={handleSubmit} className="w-full py-3.5 bg-primary rounded-2xl text-primary-foreground font-bold flex items-center justify-center gap-2 min-h-[44px]">
+                <Save className="w-4 h-4" /> Zapisz pomiar
+              </button>
             </motion.div>
           </>
         )}
