@@ -1,29 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, RotateCcw, Clock, ChevronRight, ChevronLeft, Plus, X, Check, Trash2, Calendar, Edit3 } from 'lucide-react';
-import { PlanExercise, ExerciseSet } from '@/lib/store';
-
-interface DBWorkout {
-  id: string;
-  name: string;
-  date: string;
-  duration: number;
-  completed: boolean;
-  [key: string]: any;
-}
-
-interface WorkoutPlan {
-  id: string;
-  name: string;
-  exercises: PlanExercise[];
-}
+import { Play, Pause, RotateCcw, Clock, ChevronRight, ChevronLeft, Plus, X, Check, Trash2, Calendar, Edit3, Save } from 'lucide-react';
+import { TrainingPlan, PlanExercise, WorkoutSession } from '@/lib/local-storage';
 
 interface WorkoutPageProps {
-  workouts: DBWorkout[];
-  onAdd: (w: any) => void;
-  plans: WorkoutPlan[];
-  onAddPlan: (p: any) => void;
-  onUpdatePlan: (id: string, p: any) => void;
+  workouts: WorkoutSession[];
+  onAdd: (w: Omit<WorkoutSession, 'id'>) => void;
+  plans: TrainingPlan[];
+  onAddPlan: (p: Omit<TrainingPlan, 'id'>) => void;
+  onUpdatePlan: (id: string, p: Partial<TrainingPlan>) => void;
   onRemovePlan: (id: string) => void;
   scheduled: { date: string; planId: string }[];
   onSchedule: (date: string, planId: string) => void;
@@ -56,7 +41,7 @@ function RestTimer() {
         <div className="flex gap-1">
           {[60, 90, 120].map(t => (
             <button key={t} onClick={() => { setInitial(t); setSeconds(t); setRunning(false); }}
-              className={`px-2 py-1 text-[10px] font-bold rounded-lg ${initial === t ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+              className={`px-2 py-1 text-[10px] font-bold rounded-lg min-w-[44px] min-h-[32px] ${initial === t ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
               {t}s
             </button>
           ))}
@@ -68,10 +53,10 @@ function RestTimer() {
         </span>
       </div>
       <div className="flex justify-center gap-3 mt-3">
-        <button onClick={() => setRunning(!running)} className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
+        <button onClick={() => setRunning(!running)} className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25 min-w-[44px] min-h-[44px]">
           {running ? <Pause className="w-5 h-5 text-primary-foreground" /> : <Play className="w-5 h-5 text-primary-foreground ml-0.5" />}
         </button>
-        <button onClick={reset} className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
+        <button onClick={reset} className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center min-w-[44px] min-h-[44px]">
           <RotateCcw className="w-5 h-5 text-muted-foreground" />
         </button>
       </div>
@@ -81,27 +66,24 @@ function RestTimer() {
 
 type ViewMode = 'main' | 'plan-editor' | 'active-workout' | 'calendar';
 
+interface ActiveExercise {
+  name: string;
+  sets: { reps: number; weight: number; completed: boolean }[];
+}
+
 export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdatePlan, onRemovePlan, scheduled, onSchedule, onRemoveSchedule }: WorkoutPageProps) {
   const [view, setView] = useState<ViewMode>('main');
-  const [editingPlan, setEditingPlan] = useState<WorkoutPlan | null>(null);
+  const [editingPlan, setEditingPlan] = useState<TrainingPlan | null>(null);
   const [planName, setPlanName] = useState('');
   const [planExercises, setPlanExercises] = useState<PlanExercise[]>([]);
-  const [activeWorkout, setActiveWorkout] = useState<{ name: string; exercises: { name: string; sets: ExerciseSet[] }[] } | null>(null);
+  const [activeWorkout, setActiveWorkout] = useState<{ name: string; startTime: number; exercises: ActiveExercise[] } | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-  const openNewPlan = () => {
-    setEditingPlan(null);
-    setPlanName('');
-    setPlanExercises([]);
-    setView('plan-editor');
-  };
+  const openNewPlan = () => { setEditingPlan(null); setPlanName(''); setPlanExercises([]); setView('plan-editor'); };
 
-  const openEditPlan = (plan: WorkoutPlan) => {
-    setEditingPlan(plan);
-    setPlanName(plan.name);
-    setPlanExercises([...plan.exercises]);
-    setView('plan-editor');
+  const openEditPlan = (plan: TrainingPlan) => {
+    setEditingPlan(plan); setPlanName(plan.name); setPlanExercises([...plan.exercises]); setView('plan-editor');
   };
 
   const addExercise = () => {
@@ -126,9 +108,10 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
     setView('main');
   };
 
-  const startPlan = (plan: WorkoutPlan) => {
+  const startPlan = (plan: TrainingPlan) => {
     setActiveWorkout({
       name: plan.name,
+      startTime: Date.now(),
       exercises: plan.exercises.map(e => ({
         name: e.name,
         sets: Array.from({ length: e.sets }, () => ({ reps: e.reps, weight: e.weight, completed: false })),
@@ -161,12 +144,13 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
 
   const finishWorkout = () => {
     if (!activeWorkout) return;
+    const duration = Math.round((Date.now() - activeWorkout.startTime) / 60000);
     onAdd({
       name: activeWorkout.name,
       date: new Date().toISOString().split('T')[0],
-      duration: 60,
+      duration: Math.max(duration, 1),
       completed: true,
-      exercises: activeWorkout.exercises.map((e, i) => ({ id: String(i), name: e.name, sets: e.sets, restTime: 90 })),
+      exercises: activeWorkout.exercises,
     });
     setActiveWorkout(null);
     setView('main');
@@ -174,10 +158,8 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
 
   // Calendar helpers
   const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
+    const year = date.getFullYear(); const month = date.getMonth();
+    const firstDay = new Date(year, month, 1); const lastDay = new Date(year, month + 1, 0);
     const days: (number | null)[] = [];
     const startPad = (firstDay.getDay() + 6) % 7;
     for (let i = 0; i < startPad; i++) days.push(null);
@@ -195,7 +177,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
   if (view === 'plan-editor') {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-4 pt-2 pb-28">
-        <button onClick={() => setView('main')} className="flex items-center gap-1 text-sm font-semibold text-primary mb-4">
+        <button onClick={() => setView('main')} className="flex items-center gap-1 text-sm font-semibold text-primary mb-4 min-h-[44px]">
           <ChevronLeft className="w-4 h-4" /> Powrót
         </button>
         <h2 className="text-xl font-bold mb-4">{editingPlan ? 'Edytuj plan' : 'Nowy plan treningowy'}</h2>
@@ -209,39 +191,26 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
             <div key={ex.id} className="ios-card p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold text-muted-foreground">Ćwiczenie {idx + 1}</span>
-                <button onClick={() => removeExercise(idx)} className="p-1 text-muted-foreground hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => removeExercise(idx)} className="p-2 text-muted-foreground hover:text-destructive min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
               </div>
               <input value={ex.name} onChange={e => updateExercise(idx, 'name', e.target.value)} placeholder="Nazwa ćwiczenia"
                 className="w-full px-3 py-2 bg-muted rounded-xl text-sm font-semibold mb-2 focus:outline-none focus:ring-2 focus:ring-primary/30" />
               <div className="grid grid-cols-4 gap-2">
-                <div>
-                  <label className="text-[10px] text-muted-foreground block mb-1">Serie</label>
-                  <input type="number" value={ex.sets} onChange={e => updateExercise(idx, 'sets', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 bg-muted rounded-lg text-sm font-semibold text-center focus:outline-none" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground block mb-1">Powt.</label>
-                  <input type="number" value={ex.reps} onChange={e => updateExercise(idx, 'reps', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 bg-muted rounded-lg text-sm font-semibold text-center focus:outline-none" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground block mb-1">Ciężar</label>
-                  <input type="number" value={ex.weight || ''} onChange={e => updateExercise(idx, 'weight', Number(e.target.value))}
-                    placeholder="kg" className="w-full px-2 py-1.5 bg-muted rounded-lg text-sm font-semibold text-center focus:outline-none" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground block mb-1">Przerwa</label>
-                  <input type="number" value={ex.restTime} onChange={e => updateExercise(idx, 'restTime', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 bg-muted rounded-lg text-sm font-semibold text-center focus:outline-none" />
-                </div>
+                {([['sets', 'Serie'], ['reps', 'Powt.'], ['weight', 'Ciężar'], ['restTime', 'Przerwa']] as const).map(([field, label]) => (
+                  <div key={field}>
+                    <label className="text-[10px] text-muted-foreground block mb-1">{label}</label>
+                    <input type="number" value={(ex as any)[field] || ''} onChange={e => updateExercise(idx, field, Number(e.target.value))}
+                      placeholder={field === 'weight' ? 'kg' : ''} className="w-full px-2 py-1.5 bg-muted rounded-lg text-sm font-semibold text-center focus:outline-none" />
+                  </div>
+                ))}
               </div>
             </div>
           ))}
         </div>
-        <button onClick={addExercise} className="w-full py-3 bg-muted rounded-2xl text-sm font-bold text-muted-foreground mb-3 flex items-center justify-center gap-2">
+        <button onClick={addExercise} className="w-full py-3 bg-muted rounded-2xl text-sm font-bold text-muted-foreground mb-3 flex items-center justify-center gap-2 min-h-[44px]">
           <Plus className="w-4 h-4" /> Dodaj ćwiczenie
         </button>
-        <button onClick={savePlan} className="w-full py-3.5 bg-primary rounded-2xl text-primary-foreground font-bold shadow-lg shadow-primary/25">
+        <button onClick={savePlan} className="w-full py-3.5 bg-primary rounded-2xl text-primary-foreground font-bold shadow-lg shadow-primary/25 min-h-[44px]">
           {editingPlan ? 'Zapisz zmiany' : 'Utwórz plan'}
         </button>
       </motion.div>
@@ -275,7 +244,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
                     <input type="number" value={set.reps || ''} onChange={e => updateSetField(exIdx, setIdx, 'reps', Number(e.target.value))} placeholder="0"
                       className="w-full px-2 py-1.5 bg-muted rounded-lg text-sm font-semibold text-center focus:outline-none focus:ring-1 focus:ring-primary/30" />
                     <button onClick={() => toggleSet(exIdx, setIdx)}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center ${set.completed ? 'bg-primary' : 'bg-muted'}`}>
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center min-w-[44px] min-h-[44px] ${set.completed ? 'bg-primary' : 'bg-muted'}`}>
                       <Check className={`w-4 h-4 ${set.completed ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
                     </button>
                   </div>
@@ -285,8 +254,10 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
           ))}
         </div>
         <div className="mt-4 flex gap-3">
-          <button onClick={() => { setActiveWorkout(null); setView('main'); }} className="flex-1 py-3.5 bg-muted rounded-2xl font-bold text-sm text-muted-foreground">Anuluj</button>
-          <button onClick={finishWorkout} className="flex-1 py-3.5 bg-primary rounded-2xl font-bold text-sm text-primary-foreground shadow-lg shadow-primary/25">Zakończ trening</button>
+          <button onClick={() => { setActiveWorkout(null); setView('main'); }} className="flex-1 py-3.5 bg-muted rounded-2xl font-bold text-sm text-muted-foreground min-h-[44px]">Anuluj</button>
+          <button onClick={finishWorkout} className="flex-1 py-3.5 bg-primary rounded-2xl font-bold text-sm text-primary-foreground shadow-lg shadow-primary/25 flex items-center justify-center gap-2 min-h-[44px]">
+            <Save className="w-4 h-4" /> Zakończ trening
+          </button>
         </div>
       </motion.div>
     );
@@ -299,17 +270,17 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
 
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-4 pt-2 pb-28">
-        <button onClick={() => setView('main')} className="flex items-center gap-1 text-sm font-semibold text-primary mb-4">
+        <button onClick={() => setView('main')} className="flex items-center gap-1 text-sm font-semibold text-primary mb-4 min-h-[44px]">
           <ChevronLeft className="w-4 h-4" /> Powrót
         </button>
         <h2 className="text-xl font-bold mb-4">Kalendarz treningów</h2>
         <div className="ios-card p-4 mb-4">
           <div className="flex items-center justify-between mb-4">
             <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))}
-              className="p-1"><ChevronLeft className="w-5 h-5 text-muted-foreground" /></button>
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><ChevronLeft className="w-5 h-5 text-muted-foreground" /></button>
             <span className="text-sm font-bold capitalize">{monthLabel}</span>
             <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1))}
-              className="p-1"><ChevronRight className="w-5 h-5 text-muted-foreground" /></button>
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><ChevronRight className="w-5 h-5 text-muted-foreground" /></button>
           </div>
           <div className="grid grid-cols-7 gap-1 mb-2">
             {['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'].map(d => (
@@ -325,7 +296,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
               const isToday = dateStr === new Date().toISOString().split('T')[0];
               return (
                 <button key={i} onClick={() => setSelectedDate(dateStr)}
-                  className={`w-full aspect-square rounded-xl flex flex-col items-center justify-center text-xs font-semibold relative
+                  className={`w-full aspect-square rounded-xl flex flex-col items-center justify-center text-xs font-semibold relative min-h-[44px]
                     ${isSelected ? 'bg-primary text-primary-foreground' : isToday ? 'bg-primary/10 text-primary' : 'text-foreground'}
                   `}>
                   {day}
@@ -336,7 +307,6 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
           </div>
         </div>
 
-        {/* Selected date details */}
         {selectedDate && (
           <div className="ios-card p-4">
             <p className="text-sm font-bold mb-3">{new Date(selectedDate + 'T00:00').toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
@@ -348,7 +318,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-semibold text-primary">{plan.name}</span>
-                      <button onClick={() => onRemoveSchedule(selectedDate)} className="text-xs text-destructive font-semibold">Usuń</button>
+                      <button onClick={() => onRemoveSchedule(selectedDate)} className="text-xs text-destructive font-semibold min-h-[44px] px-2">Usuń</button>
                     </div>
                     <p className="text-xs text-muted-foreground">{plan.exercises.length} ćwiczeń</p>
                   </div>
@@ -360,7 +330,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
                   <div className="space-y-2">
                     {plans.map(p => (
                       <button key={p.id} onClick={() => onSchedule(selectedDate, p.id)}
-                        className="w-full p-3 bg-muted rounded-xl text-left text-sm font-semibold active:scale-[0.98] transition-transform">
+                        className="w-full p-3 bg-muted rounded-xl text-left text-sm font-semibold active:scale-[0.98] transition-transform min-h-[44px]">
                         {p.name}
                       </button>
                     ))}
@@ -383,37 +353,35 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
           <p className="text-sm text-muted-foreground">Zacznij lub przeglądaj treningi</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setView('calendar')} className="w-10 h-10 bg-muted rounded-2xl flex items-center justify-center">
+          <button onClick={() => setView('calendar')} className="w-10 h-10 bg-muted rounded-2xl flex items-center justify-center min-w-[44px] min-h-[44px]">
             <Calendar className="w-5 h-5 text-muted-foreground" />
           </button>
-          <button onClick={openNewPlan} className="w-10 h-10 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
+          <button onClick={openNewPlan} className="w-10 h-10 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25 min-w-[44px] min-h-[44px]">
             <Plus className="w-5 h-5 text-primary-foreground" />
           </button>
         </div>
       </motion.div>
 
-      {/* Plans */}
       <motion.div variants={item}>
         <h3 className="ios-section-title mb-2">Twoje plany</h3>
         <div className="space-y-2 mb-5">
           {plans.map(plan => (
             <div key={plan.id} className="ios-card p-4 flex items-center gap-3">
-              <button onClick={() => startPlan(plan)} className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <button onClick={() => startPlan(plan)} className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 min-w-[44px] min-h-[44px]">
                 <Play className="w-5 h-5 text-primary" />
               </button>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold truncate">{plan.name}</p>
                 <p className="text-xs text-muted-foreground">{plan.exercises.length} ćwiczeń</p>
               </div>
-              <button onClick={() => openEditPlan(plan)} className="p-2 text-muted-foreground"><Edit3 className="w-4 h-4" /></button>
-              <button onClick={() => onRemovePlan(plan.id)} className="p-2 text-muted-foreground hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
+              <button onClick={() => openEditPlan(plan)} className="p-2 text-muted-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"><Edit3 className="w-4 h-4" /></button>
+              <button onClick={() => onRemovePlan(plan.id)} className="p-2 text-muted-foreground hover:text-destructive min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
             </div>
           ))}
           {plans.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Brak planów — utwórz pierwszy!</p>}
         </div>
       </motion.div>
 
-      {/* Recent workouts */}
       <motion.div variants={item}>
         <h3 className="ios-section-title mb-2">Ostatnie treningi</h3>
         <div className="space-y-2">
@@ -422,7 +390,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
               <div>
                 <p className="text-sm font-bold">{w.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(w.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })} • {w.duration} min • {w.exercises.length} ćwiczeń
+                  {new Date(w.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })} • {w.duration} min
                 </p>
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground" />

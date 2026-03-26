@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Flame, TrendingUp, Calendar, ChevronRight, Zap } from 'lucide-react';
+import { Flame, TrendingUp, Calendar, ChevronRight, Zap, AlertTriangle } from 'lucide-react';
 import CalorieRing from '@/components/CalorieRing';
 import MacroBar from '@/components/MacroBar';
 import { UserGoals } from '@/lib/store';
@@ -9,6 +9,7 @@ interface HomePageProps {
   goals: UserGoals;
   streak: number;
   onNavigate: (tab: string) => void;
+  stagnationWarning?: string;
 }
 
 const container = {
@@ -20,7 +21,7 @@ const item = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
-export default function HomePage({ dailyTotals, goals, streak, onNavigate }: HomePageProps) {
+export default function HomePage({ dailyTotals, goals, streak, onNavigate, stagnationWarning }: HomePageProps) {
   const today = new Date();
   const dayName = today.toLocaleDateString('pl-PL', { weekday: 'long' });
   const dateStr = today.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' });
@@ -34,13 +35,21 @@ export default function HomePage({ dailyTotals, goals, streak, onNavigate }: Hom
         <h1 className="text-2xl font-bold text-foreground">{dateStr}</h1>
       </motion.div>
 
+      {/* Stagnation warning */}
+      {stagnationWarning && (
+        <motion.div variants={item} className="ios-card p-4 mb-4 flex items-center gap-3 bg-accent/5 border border-accent/20">
+          <AlertTriangle className="w-5 h-5 text-accent flex-shrink-0" />
+          <p className="text-xs font-medium text-foreground">{stagnationWarning}</p>
+        </motion.div>
+      )}
+
       {/* Streak Banner */}
       <motion.div variants={item} className="ios-card-elevated p-4 mb-4 flex items-center gap-4 bg-gradient-to-r from-primary/5 to-accent/5">
         <div className="w-12 h-12 rounded-2xl bg-accent/15 flex items-center justify-center">
           <Flame className="w-6 h-6 text-accent" />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-bold text-foreground">{streak} dni z rzędu! 🔥</p>
+          <p className="text-sm font-bold text-foreground">{streak} treningów! 🔥</p>
           <p className="text-xs text-muted-foreground">Świetna passa, nie przerywaj!</p>
         </div>
         <div className="text-2xl font-black text-accent">{streak}</div>
@@ -66,14 +75,14 @@ export default function HomePage({ dailyTotals, goals, streak, onNavigate }: Hom
 
       {/* Quick Actions */}
       <motion.div variants={item} className="grid grid-cols-2 gap-3 mb-4">
-        <button onClick={() => onNavigate('meals')} className="ios-card p-4 text-left active:scale-[0.97] transition-transform">
+        <button onClick={() => onNavigate('meals')} className="ios-card p-4 text-left active:scale-[0.97] transition-transform min-h-[44px]">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
             <Zap className="w-5 h-5 text-primary" />
           </div>
           <p className="text-sm font-bold">Dodaj posiłek</p>
           <p className="text-xs text-muted-foreground mt-0.5">Śledź kalorie</p>
         </button>
-        <button onClick={() => onNavigate('workout')} className="ios-card p-4 text-left active:scale-[0.97] transition-transform">
+        <button onClick={() => onNavigate('workout')} className="ios-card p-4 text-left active:scale-[0.97] transition-transform min-h-[44px]">
           <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center mb-3">
             <TrendingUp className="w-5 h-5 text-accent" />
           </div>
