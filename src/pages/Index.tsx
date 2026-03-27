@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import BottomTabBar, { TabId } from '@/components/BottomTabBar';
 import HomePage from '@/pages/HomePage';
 import MealsPage from '@/pages/MealsPage';
@@ -20,14 +20,50 @@ export default function Index() {
   const targets = ls.getTargets();
   const onboarded = ls.isOnboarded();
 
-  // Onboarding
+  // Reminder notifications check
+  useEffect(() => {
+    const interval = setInterval(() => {
+      try {
+        const reminders = JSON.parse(localStorage.getItem('ft_reminders') || '[]');
+        const now = new Date();
+        const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        reminders.forEach((r: any) => {
+          if (r.enabled && r.time === hhmm && 'Notification' in window && Notification.permission === 'granted') {
+            new Notification(`FitTracker: ${r.label}`, { body: `Czas na: ${r.label}`, icon: '/icon-192.png' });
+          }
+        });
+      } catch {}
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Restore theme on mount
+  useEffect(() => {
+    const mode = localStorage.getItem('ft_theme_mode') || 'system';
+    const root = document.documentElement;
+    root.classList.remove('dark');
+    if (mode === 'dark') root.classList.add('dark');
+    else if (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) root.classList.add('dark');
+
+    const colorIdx = Number(localStorage.getItem('ft_theme_color') || '0');
+    const themes = [
+      { hue: '160 84% 39%' }, { hue: '340 82% 52%' }, { hue: '210 90% 50%' },
+      { hue: '30 50% 50%' }, { hue: '220 15% 50%' },
+    ];
+    const t = themes[colorIdx];
+    if (t) {
+      root.style.setProperty('--primary', t.hue);
+      root.style.setProperty('--ring', t.hue);
+      root.style.setProperty('--calories-ring', t.hue);
+    }
+  }, []);
+
   if (!onboarded || !profile) {
     return (
       <OnboardingStepper
         onComplete={(p: ProfileInput) => {
           ls.setProfile(p);
           ls.setOnboarded(true);
-          // Initialize meal schedule
           ls.setMealSchedule(ls.getMealSchedule(p.mealsPerDay));
           refresh();
           toast.success(`Cześć ${p.name}! Twoje cele zostały obliczone.`);
@@ -61,7 +97,6 @@ export default function Index() {
     goalType: profile.goal,
   };
 
-  // Check stagnation
   const stagnation = checkWeightStagnation(ls.getWeightHistory(), profile.goal);
 
   const handleAddFood = (product: ls.Product, quantity: number, unit: string, mealType: string) => {
@@ -86,43 +121,32 @@ export default function Index() {
     refresh();
   };
 
-  const handleRemoveMeal = (id: string) => {
-    ls.removeMeal(id);
-    refresh();
-  };
+  const handleRemoveMeal = (id: string) => { ls.removeMeal(id); refresh(); };
 
-  const handleAddMeasurement = (m: Record<string, any>) => {
-    ls.addMeasurement(m as any);
-    refresh();
-  };
+  const handleAddMeasurement = (m: Record<string, any>) => { ls.addMeasurement(m as any); refresh(); };
 
-  const handleAddWorkout = (w: any) => {
-    ls.addWorkoutSession(w);
-    refresh();
-  };
+  const handleAddWorkout = (w: any) => { ls.addWorkoutSession(w); refresh(); };
 
-  const handleAddPlan = (p: any) => {
-    ls.addPlan(p);
-    refresh();
-  };
+  const handleAddPlan = (p: any) => { ls.addPlan(p); refresh(); };
 
-  const handleUpdatePlan = (id: string, p: any) => {
-    ls.updatePlan(id, p);
-    refresh();
-  };
+  const handleUpdatePlan = (id: string, p: any) => { ls.updatePlan(id, p); refresh(); };
 
-  const handleRemovePlan = (id: string) => {
-    ls.removePlan(id);
-    refresh();
-  };
+  const handleRemovePlan = (id: string) => { ls.removePlan(id); refresh(); };
 
   const handleSchedule = (date: string, planId: string) => {
     ls.scheduleWorkout(date, planId);
     refresh();
   };
 
-  const handleRemoveSchedule = (date: string) => {
-    ls.removeSchedule(date);
+  const handleRemoveSchedule = (date: string, planId?: string) => {
+    if (planId) {
+      // Remove specific plan from date
+      const all = ls.getScheduled().filter(s => !(s.date === date && s.planId === planId));
+      // We need to update localStorage directly for multi-workout support
+      localStorage.setItem('ft_scheduled', JSON.stringify(all));
+    } else {
+      ls.removeSchedule(date);
+    }
     refresh();
   };
 
@@ -143,6 +167,9 @@ export default function Index() {
             streak={workouts.length}
             onNavigate={(tab) => setActiveTab(tab as TabId)}
             stagnationWarning={stagnation.stagnated ? stagnation.suggestion : undefined}
+            plans={plans}
+            scheduled={scheduled}
+            workouts={workouts}
           />
         );
       case 'meals':
