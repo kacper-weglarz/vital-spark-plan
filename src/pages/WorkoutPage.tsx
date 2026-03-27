@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, RotateCcw, Clock, ChevronRight, ChevronLeft, Plus, X, Check, Trash2, Calendar, Edit3, Save } from 'lucide-react';
-import { TrainingPlan, PlanExercise, WorkoutSession } from '@/lib/local-storage';
+import { TrainingPlan, PlanExercise, WorkoutSession, ScheduledWorkout } from '@/lib/local-storage';
 
 interface WorkoutPageProps {
   workouts: WorkoutSession[];
@@ -10,9 +10,9 @@ interface WorkoutPageProps {
   onAddPlan: (p: Omit<TrainingPlan, 'id'>) => void;
   onUpdatePlan: (id: string, p: Partial<TrainingPlan>) => void;
   onRemovePlan: (id: string) => void;
-  scheduled: { date: string; planId: string }[];
+  scheduled: ScheduledWorkout[];
   onSchedule: (date: string, planId: string) => void;
-  onRemoveSchedule: (date: string) => void;
+  onRemoveSchedule: (date: string, planId?: string) => void;
 }
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -145,11 +145,12 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
   const finishWorkout = () => {
     if (!activeWorkout) return;
     const duration = Math.round((Date.now() - activeWorkout.startTime) / 60000);
+    const allCompleted = activeWorkout.exercises.every(ex => ex.sets.every(s => s.completed));
     onAdd({
       name: activeWorkout.name,
       date: new Date().toISOString().split('T')[0],
       duration: Math.max(duration, 1),
-      completed: true,
+      completed: allCompleted,
       exercises: activeWorkout.exercises,
     });
     setActiveWorkout(null);
@@ -172,6 +173,9 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
     const m = String(calendarMonth.getMonth() + 1).padStart(2, '0');
     return `${y}-${m}-${String(day).padStart(2, '0')}`;
   };
+
+  // Get all scheduled workouts for a date (multi-workout support)
+  const getScheduledForDate = (date: string) => scheduled.filter(s => s.date === date);
 
   // Plan editor view
   if (view === 'plan-editor') {
@@ -200,7 +204,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
                   <div key={field}>
                     <label className="text-[10px] text-muted-foreground block mb-1">{label}</label>
                     <input type="number" value={(ex as any)[field] || ''} onChange={e => updateExercise(idx, field, Number(e.target.value))}
-                      placeholder={field === 'weight' ? 'kg' : ''} className="w-full px-2 py-1.5 bg-muted rounded-lg text-sm font-semibold text-center focus:outline-none" />
+                      className="w-full px-2 py-1.5 bg-muted rounded-lg text-sm font-semibold text-center focus:outline-none" />
                   </div>
                 ))}
               </div>
@@ -263,7 +267,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
     );
   }
 
-  // Calendar view
+  // Calendar view - with multiple workouts per day
   if (view === 'calendar') {
     const days = getDaysInMonth(calendarMonth);
     const monthLabel = calendarMonth.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
@@ -291,7 +295,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
             {days.map((day, i) => {
               if (day === null) return <div key={i} />;
               const dateStr = formatDateStr(day);
-              const hasSchedule = scheduled.some(s => s.date === dateStr);
+              const dayScheduled = getScheduledForDate(dateStr);
               const isSelected = selectedDate === dateStr;
               const isToday = dateStr === new Date().toISOString().split('T')[0];
               return (
@@ -300,7 +304,13 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
                     ${isSelected ? 'bg-primary text-primary-foreground' : isToday ? 'bg-primary/10 text-primary' : 'text-foreground'}
                   `}>
                   {day}
-                  {hasSchedule && <div className={`w-1.5 h-1.5 rounded-full absolute bottom-1 ${isSelected ? 'bg-primary-foreground' : 'bg-accent'}`} />}
+                  {dayScheduled.length > 0 && (
+                    <div className="flex gap-0.5 absolute bottom-1">
+                      {dayScheduled.slice(0, 3).map((_, j) => (
+                        <div key={j} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-primary-foreground' : 'bg-accent'}`} />
+                      ))}
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -311,16 +321,34 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
           <div className="ios-card p-4">
             <p className="text-sm font-bold mb-3">{new Date(selectedDate + 'T00:00').toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
             {(() => {
-              const sw = scheduled.find(s => s.date === selectedDate);
-              const plan = sw ? plans.find(p => p.id === sw.planId) : null;
-              if (plan) {
+              const dayScheduled = getScheduledForDate(selectedDate);
+              const scheduledPlans = dayScheduled
+                .map(s => ({ schedule: s, plan: plans.find(p => p.id === s.planId) }))
+                .filter(x => x.plan) as { schedule: ScheduledWorkout; plan: TrainingPlan }[];
+
+              if (scheduledPlans.length > 0) {
                 return (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-primary">{plan.name}</span>
-                      <button onClick={() => onRemoveSchedule(selectedDate)} className="text-xs text-destructive font-semibold min-h-[44px] px-2">Usuń</button>
+                  <div className="space-y-2">
+                    {scheduledPlans.map(({ schedule, plan }) => (
+                      <div key={plan.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-xl">
+                        <div>
+                          <span className="text-sm font-semibold text-primary">{plan.name}</span>
+                          <p className="text-xs text-muted-foreground">{plan.exercises.length} ćwiczeń</p>
+                        </div>
+                        <button onClick={() => onRemoveSchedule(selectedDate, plan.id)} className="text-xs text-destructive font-semibold min-h-[44px] px-2">Usuń</button>
+                      </div>
+                    ))}
+                    <div className="pt-2 border-t border-border/30">
+                      <p className="text-xs text-muted-foreground mb-2">Dodaj kolejny trening:</p>
+                      <div className="space-y-1">
+                        {plans.filter(p => !dayScheduled.some(s => s.planId === p.id)).map(p => (
+                          <button key={p.id} onClick={() => onSchedule(selectedDate, p.id)}
+                            className="w-full p-2.5 bg-muted rounded-xl text-left text-sm font-semibold active:scale-[0.98] transition-transform min-h-[44px]">
+                            + {p.name}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">{plan.exercises.length} ćwiczeń</p>
                   </div>
                 );
               }
@@ -393,7 +421,9 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
                   {new Date(w.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })} • {w.duration} min
                 </p>
               </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              {w.completed && w.exercises.every(ex => ex.sets.every(s => s.completed)) && (
+                <Check className="w-5 h-5 text-primary" />
+              )}
             </div>
           ))}
           {workouts.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">Brak treningów — zacznij pierwszy!</p>}

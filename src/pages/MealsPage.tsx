@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Sunrise, Sun, Cloud, Moon, Coffee, Salad } from 'lucide-react';
 import CalorieRing from '@/components/CalorieRing';
 import AddFoodSheet from '@/components/AddFoodSheet';
 import { UserGoals } from '@/lib/store';
@@ -19,7 +19,16 @@ interface MealsPageProps {
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
 
-const MEAL_EMOJIS: Record<number, string> = { 0: '🌅', 1: '🥪', 2: '☀️', 3: '🌙', 4: '🍎', 5: '🥗' };
+const MEAL_ICONS = [Sunrise, Coffee, Sun, Moon, Cloud, Salad];
+
+function MacroValue({ current, target, colorClass }: { current: number; target: number; colorClass: string }) {
+  const exceeded = current > target;
+  return (
+    <p className={`text-base font-bold ${exceeded ? 'text-destructive' : colorClass}`}>
+      {Math.round(current)}g
+    </p>
+  );
+}
 
 export default function MealsPage({ meals, dailyTotals, goals, onAdd, onRemove, profile }: MealsPageProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -37,6 +46,8 @@ export default function MealsPage({ meals, dailyTotals, goals, onAdd, onRemove, 
     setSheetOpen(true);
   };
 
+  const calExceeded = dailyTotals.calories > goals.calorieTarget;
+
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="px-4 pt-2 pb-28">
       <motion.div variants={item} className="mb-5">
@@ -48,29 +59,40 @@ export default function MealsPage({ meals, dailyTotals, goals, onAdd, onRemove, 
         <CalorieRing current={dailyTotals.calories} target={goals.calorieTarget} size={100} strokeWidth={8} />
         <div className="flex-1 grid grid-cols-3 gap-2 text-center">
           <div>
-            <p className="text-base font-bold macro-protein">{Math.round(dailyTotals.protein)}g</p>
+            <MacroValue current={dailyTotals.protein} target={goals.proteinTarget} colorClass="macro-protein" />
             <p className="text-[10px] text-muted-foreground">Białko</p>
           </div>
           <div>
-            <p className="text-base font-bold macro-carbs">{Math.round(dailyTotals.carbs)}g</p>
+            <MacroValue current={dailyTotals.carbs} target={goals.carbsTarget} colorClass="macro-carbs" />
             <p className="text-[10px] text-muted-foreground">Węgle</p>
           </div>
           <div>
-            <p className="text-base font-bold macro-fat">{Math.round(dailyTotals.fat)}g</p>
+            <MacroValue current={dailyTotals.fat} target={goals.fatTarget} colorClass="macro-fat" />
             <p className="text-[10px] text-muted-foreground">Tłuszcze</p>
           </div>
         </div>
       </motion.div>
 
+      {calExceeded && (
+        <motion.div variants={item} className="mb-3 p-3 bg-destructive/10 rounded-2xl text-center">
+          <p className="text-xs font-bold text-destructive">
+            Przekroczono cel kaloryczny o {Math.round(dailyTotals.calories - goals.calorieTarget)} kcal
+          </p>
+        </motion.div>
+      )}
+
       {mealSlots.map((slot, i) => {
         const type = `meal_${i}`;
         const mealEntries = meals.filter(m => m.meal_type === type);
         const mealCals = getMealCalories(type);
+        const Icon = MEAL_ICONS[i] || Sun;
         return (
           <motion.div key={type} variants={item} className="ios-card p-4 mb-3">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{MEAL_EMOJIS[i] || '🍽️'}</span>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center">
+                  <Icon className="w-4 h-4 text-muted-foreground" />
+                </div>
                 <div>
                   <h3 className="text-sm font-bold">{slot.label}</h3>
                   <p className="text-xs text-muted-foreground">{slot.time} • {Math.round(mealCals)} kcal</p>

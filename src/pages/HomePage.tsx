@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
-import { Flame, TrendingUp, Calendar, ChevronRight, Zap, AlertTriangle } from 'lucide-react';
-import CalorieRing from '@/components/CalorieRing';
-import MacroBar from '@/components/MacroBar';
+import { Flame, Zap, TrendingUp, AlertTriangle, CheckCircle2, Circle, Dumbbell } from 'lucide-react';
+import FitnessRings from '@/components/FitnessRings';
 import { UserGoals } from '@/lib/store';
+import { TrainingPlan, WorkoutSession, ScheduledWorkout } from '@/lib/local-storage';
 
 interface HomePageProps {
   dailyTotals: { calories: number; protein: number; carbs: number; fat: number };
@@ -10,6 +10,9 @@ interface HomePageProps {
   streak: number;
   onNavigate: (tab: string) => void;
   stagnationWarning?: string;
+  plans: TrainingPlan[];
+  scheduled: ScheduledWorkout[];
+  workouts: WorkoutSession[];
 }
 
 const container = {
@@ -21,18 +24,44 @@ const item = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
-export default function HomePage({ dailyTotals, goals, streak, onNavigate, stagnationWarning }: HomePageProps) {
+export default function HomePage({ dailyTotals, goals, streak, onNavigate, stagnationWarning, plans, scheduled, workouts }: HomePageProps) {
   const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
   const dayName = today.toLocaleDateString('pl-PL', { weekday: 'long' });
   const dateStr = today.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' });
-  const remaining = goals.calorieTarget - dailyTotals.calories;
+
+  // Today's scheduled workouts
+  const todayScheduled = scheduled.filter(s => s.date === todayStr);
+  const todayPlans = todayScheduled
+    .map(s => plans.find(p => p.id === s.planId))
+    .filter(Boolean) as TrainingPlan[];
+
+  // Check if a workout for a plan is completed today
+  const isPlanCompletedToday = (plan: TrainingPlan) => {
+    return workouts.some(w =>
+      w.date === todayStr &&
+      w.name === plan.name &&
+      w.completed &&
+      w.exercises.every(ex => ex.sets.every(s => s.completed))
+    );
+  };
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="px-4 pt-2 pb-28">
-      {/* Header */}
-      <motion.div variants={item} className="mb-6">
-        <p className="text-sm text-muted-foreground font-medium capitalize">{dayName}</p>
-        <h1 className="text-2xl font-bold text-foreground">{dateStr}</h1>
+      {/* Header with date + flame */}
+      <motion.div variants={item} className="mb-5 flex items-center justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground font-medium capitalize">{dayName}</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground">{dateStr}</h1>
+            {streak > 0 && (
+              <div className="flex items-center gap-1 bg-accent/15 px-2 py-0.5 rounded-full">
+                <Flame className="w-4 h-4 text-accent" />
+                <span className="text-xs font-bold text-accent">{streak}</span>
+              </div>
+            )}
+          </div>
+        </div>
       </motion.div>
 
       {/* Stagnation warning */}
@@ -43,75 +72,82 @@ export default function HomePage({ dailyTotals, goals, streak, onNavigate, stagn
         </motion.div>
       )}
 
-      {/* Streak Banner */}
-      <motion.div variants={item} className="ios-card-elevated p-4 mb-4 flex items-center gap-4 bg-gradient-to-r from-primary/5 to-accent/5">
-        <div className="w-12 h-12 rounded-2xl bg-accent/15 flex items-center justify-center">
-          <Flame className="w-6 h-6 text-accent" />
-        </div>
-        <div className="flex-1">
-          <p className="text-sm font-bold text-foreground">{streak} treningów! 🔥</p>
-          <p className="text-xs text-muted-foreground">Świetna passa, nie przerywaj!</p>
-        </div>
-        <div className="text-2xl font-black text-accent">{streak}</div>
-      </motion.div>
-
-      {/* Calorie Summary */}
+      {/* Apple Fitness Rings */}
       <motion.div variants={item} className="ios-card p-5 mb-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-bold">Dzisiejsze kalorie</h2>
-          <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${remaining > 0 ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}`}>
-            {remaining > 0 ? `Zostało ${Math.round(remaining)}` : `Przekroczono o ${Math.round(-remaining)}`}
-          </span>
-        </div>
-        <div className="flex items-center gap-6">
-          <CalorieRing current={dailyTotals.calories} target={goals.calorieTarget} />
-          <div className="flex-1 space-y-3">
-            <MacroBar label="Białko" current={dailyTotals.protein} target={goals.proteinTarget} color="protein" />
-            <MacroBar label="Węglowodany" current={dailyTotals.carbs} target={goals.carbsTarget} color="carbs" />
-            <MacroBar label="Tłuszcze" current={dailyTotals.fat} target={goals.fatTarget} color="fat" />
-          </div>
-        </div>
+        <FitnessRings
+          calories={{ current: dailyTotals.calories, target: goals.calorieTarget }}
+          protein={{ current: dailyTotals.protein, target: goals.proteinTarget }}
+          carbs={{ current: dailyTotals.carbs, target: goals.carbsTarget }}
+          fat={{ current: dailyTotals.fat, target: goals.fatTarget }}
+          size={200}
+        />
       </motion.div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions - 3D tactile buttons */}
       <motion.div variants={item} className="grid grid-cols-2 gap-3 mb-4">
-        <button onClick={() => onNavigate('meals')} className="ios-card p-4 text-left active:scale-[0.97] transition-transform min-h-[44px]">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-            <Zap className="w-5 h-5 text-primary" />
+        <button
+          onClick={() => onNavigate('meals')}
+          className="relative p-4 rounded-2xl text-left active:scale-[0.95] transition-all min-h-[44px]
+            bg-gradient-to-b from-card to-muted border border-border/60
+            shadow-[0_4px_12px_-2px_hsl(var(--foreground)/0.08),inset_0_1px_0_hsl(0_0%_100%/0.6)]
+            dark:shadow-[0_4px_12px_-2px_hsl(var(--foreground)/0.2),inset_0_1px_0_hsl(0_0%_100%/0.05)]"
+        >
+          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-2">
+            <Zap className="w-4.5 h-4.5 text-primary" />
           </div>
           <p className="text-sm font-bold">Dodaj posiłek</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Śledź kalorie</p>
         </button>
-        <button onClick={() => onNavigate('workout')} className="ios-card p-4 text-left active:scale-[0.97] transition-transform min-h-[44px]">
-          <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center mb-3">
-            <TrendingUp className="w-5 h-5 text-accent" />
+        <button
+          onClick={() => onNavigate('workout')}
+          className="relative p-4 rounded-2xl text-left active:scale-[0.95] transition-all min-h-[44px]
+            bg-gradient-to-b from-card to-muted border border-border/60
+            shadow-[0_4px_12px_-2px_hsl(var(--foreground)/0.08),inset_0_1px_0_hsl(0_0%_100%/0.6)]
+            dark:shadow-[0_4px_12px_-2px_hsl(var(--foreground)/0.2),inset_0_1px_0_hsl(0_0%_100%/0.05)]"
+        >
+          <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center mb-2">
+            <TrendingUp className="w-4.5 h-4.5 text-accent" />
           </div>
-          <p className="text-sm font-bold">Zacznij trening</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Push / Pull / Legs</p>
+          <p className="text-sm font-bold">Rozpocznij trening</p>
         </button>
       </motion.div>
 
-      {/* Weekly Check-in */}
-      <motion.div variants={item} className="mt-4 ios-card p-4">
+      {/* Today's Plan */}
+      <motion.div variants={item} className="ios-card p-4">
         <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-primary" /> Tydzień
+          <Dumbbell className="w-4 h-4 text-primary" /> Twój dzisiejszy plan:
         </h3>
-        <div className="flex justify-between">
-          {['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'].map((day, i) => {
-            const isToday = i === (today.getDay() + 6) % 7;
-            const completed = i <= (today.getDay() + 6) % 7;
-            return (
-              <div key={day} className="flex flex-col items-center gap-1.5">
-                <span className="text-[10px] font-medium text-muted-foreground">{day}</span>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                  isToday ? 'bg-primary text-primary-foreground' : completed ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
-                }`}>
-                  {completed ? '✓' : ''}
+        {todayPlans.length > 0 ? (
+          <div className="space-y-3">
+            {todayPlans.map(plan => {
+              const completed = isPlanCompletedToday(plan);
+              return (
+                <div key={plan.id} className="p-3 bg-muted/50 rounded-xl">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
+                    {dayName}, {dateStr}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-base font-bold flex-1">{plan.name}</p>
+                    {completed ? (
+                      <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
+                    ) : (
+                      <Circle className="w-5 h-5 text-muted-foreground/30 flex-shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {plan.exercises.length} ćwiczeń
+                  </p>
+                  <p className="text-[10px] text-muted-foreground/70 mt-1">
+                    Plan dodany do dzisiaj w Treningach
+                  </p>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground text-center py-4">
+            Brak zaplanowanych treningów na dziś. Przejdź do kalendarza treningów, aby dodać plan.
+          </p>
+        )}
       </motion.div>
     </motion.div>
   );
