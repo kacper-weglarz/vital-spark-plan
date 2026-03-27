@@ -227,8 +227,9 @@ export function getScheduled(): ScheduledWorkout[] {
 
 export function scheduleWorkout(date: string, planId: string) {
   const all = get<ScheduledWorkout[]>(KEYS.SCHEDULED, []);
-  const filtered = all.filter(s => s.date !== date);
-  set(KEYS.SCHEDULED, [...filtered, { date, planId }]);
+  // Allow multiple workouts per day - only prevent duplicate plan on same day
+  if (all.some(s => s.date === date && s.planId === planId)) return;
+  set(KEYS.SCHEDULED, [...all, { date, planId }]);
 }
 
 export function removeSchedule(date: string) {
