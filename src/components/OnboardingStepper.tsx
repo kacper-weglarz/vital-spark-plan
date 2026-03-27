@@ -79,7 +79,7 @@ export default function OnboardingStepper({ onComplete }: OnboardingStepperProps
       case 'gender':
         return (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Płeć biologiczna</h2>
+            <h2 className="text-2xl font-bold">Płeć</h2>
             <p className="text-sm text-muted-foreground">Potrzebna do obliczenia metabolizmu</p>
             <div className="grid grid-cols-2 gap-3">
               {([['male', 'Mężczyzna', '🧔'], ['female', 'Kobieta', '👩']] as const).map(([v, l, e]) => (
