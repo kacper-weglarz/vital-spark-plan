@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import BottomTabBar, { TabId } from '@/components/BottomTabBar';
 import HomePage from '@/pages/HomePage';
 import MealsPage from '@/pages/MealsPage';
@@ -11,6 +11,8 @@ import * as ls from '@/lib/local-storage';
 import { toast } from 'sonner';
 import { UserGoals } from '@/lib/store';
 
+const TAB_ORDER: TabId[] = ['home', 'meals', 'body', 'workout', 'settings'];
+
 export default function Index() {
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [, forceUpdate] = useState(0);
@@ -20,7 +22,32 @@ export default function Index() {
   const targets = ls.getTargets();
   const onboarded = ls.isOnboarded();
 
-  // Reminder notifications check
+  // Swipe navigation
+  const touchRef = useRef<{ startX: number; startY: number } | null>(null);
+
+  useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      touchRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY };
+    };
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!touchRef.current) return;
+      const dx = e.changedTouches[0].clientX - touchRef.current.startX;
+      const dy = e.changedTouches[0].clientY - touchRef.current.startY;
+      touchRef.current = null;
+      if (Math.abs(dx) < 80 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+      const idx = TAB_ORDER.indexOf(activeTab);
+      if (dx < 0 && idx < TAB_ORDER.length - 1) setActiveTab(TAB_ORDER[idx + 1]);
+      if (dx > 0 && idx > 0) setActiveTab(TAB_ORDER[idx - 1]);
+    };
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [activeTab]);
+
+  // Reminder notifications
   useEffect(() => {
     const interval = setInterval(() => {
       try {
@@ -29,7 +56,7 @@ export default function Index() {
         const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         reminders.forEach((r: any) => {
           if (r.enabled && r.time === hhmm && 'Notification' in window && Notification.permission === 'granted') {
-            new Notification(`FitTracker: ${r.label}`, { body: `Czas na: ${r.label}`, icon: '/icon-192.png' });
+            new Notification(`BD Fit: ${r.label}`, { body: `Czas na: ${r.label}`, icon: '/icon-192.png' });
           }
         });
       } catch {}
@@ -47,14 +74,16 @@ export default function Index() {
 
     const colorIdx = Number(localStorage.getItem('ft_theme_color') || '0');
     const themes = [
-      { hue: '160 84% 39%' }, { hue: '340 82% 52%' }, { hue: '210 90% 50%' },
-      { hue: '30 50% 50%' }, { hue: '220 15% 50%' },
+      { hue: '349 100% 91%' },  // #FFD1DC pastel pink
+      { hue: '199 33% 78%' },   // #AEC6CF pastel blue
+      { hue: '30 43% 86%' },    // #EEDFCC pastel beige
+      { hue: '120 33% 82%' },   // #C1E1C1 pastel green
+      { hue: '0 0% 83%' },      // #D3D3D3 light grey
     ];
     const t = themes[colorIdx];
     if (t) {
       root.style.setProperty('--primary', t.hue);
       root.style.setProperty('--ring', t.hue);
-      root.style.setProperty('--calories-ring', t.hue);
     }
   }, []);
 
@@ -140,9 +169,7 @@ export default function Index() {
 
   const handleRemoveSchedule = (date: string, planId?: string) => {
     if (planId) {
-      // Remove specific plan from date
       const all = ls.getScheduled().filter(s => !(s.date === date && s.planId === planId));
-      // We need to update localStorage directly for multi-workout support
       localStorage.setItem('ft_scheduled', JSON.stringify(all));
     } else {
       ls.removeSchedule(date);
@@ -175,12 +202,13 @@ export default function Index() {
       case 'meals':
         return (
           <MealsPage
-            meals={meals}
+            meals={ls.getAllMeals()}
             dailyTotals={dailyTotals}
             goals={goals}
             onAdd={handleAddFood}
             onRemove={handleRemoveMeal}
             profile={profile}
+            onRefresh={refresh}
           />
         );
       case 'body':
@@ -200,7 +228,7 @@ export default function Index() {
           />
         );
       case 'settings':
-        return <SettingsPage profile={profile} targets={targets} onRecalculate={handleRecalculate} />;
+        return <SettingsPage profile={profile} targets={targets} onRecalculate={handleRecalculate} onRefresh={refresh} />;
       default:
         return null;
     }
@@ -212,9 +240,9 @@ export default function Index() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/25">
-              <span className="text-sm font-black text-primary-foreground">FT</span>
+              <span className="text-sm font-black text-primary-foreground">BD</span>
             </div>
-            <span className="text-base font-bold">FitTracker</span>
+            <span className="text-base font-bold">BD Fit</span>
           </div>
           <button onClick={() => setActiveTab('settings')} className="w-9 h-9 rounded-full bg-muted flex items-center justify-center min-w-[44px] min-h-[44px]">
             <span className="text-sm">👤</span>
