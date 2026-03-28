@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X, TrendingDown, Scale, ChevronLeft, Save } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { BodyMeasurement, getProfile } from '@/lib/local-storage';
 
 interface BodyPageProps {
@@ -39,6 +39,18 @@ const FORM_FIELDS: { key: string; label: string; placeholder: string }[] = [
   { key: 'calf_right', label: 'Łydka P (cm)', placeholder: '37.5' },
 ];
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-card/95 backdrop-blur-sm px-3 py-2 rounded-xl shadow-lg border border-border/50">
+        <p className="text-[10px] text-muted-foreground">{label}</p>
+        <p className="text-sm font-bold text-primary">{payload[0].value}</p>
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
   const [showForm, setShowForm] = useState(false);
   const [chartKey, setChartKey] = useState<MeasurementKey | null>(null);
@@ -49,7 +61,6 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
   const previous = sorted[sorted.length - 2];
   const profile = getProfile();
 
-  // Get current weight: latest measurement or profile
   const currentWeight = latest?.weight ?? profile?.weight ?? null;
   const weightDiff = latest?.weight && previous?.weight ? latest.weight - previous.weight : 0;
 
@@ -97,24 +108,38 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
         <div className="ios-card p-4">
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data}>
+              <AreaChart data={data}>
+                <defs>
+                  <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickLine={false} axisLine={false} />
                 <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickLine={false} axisLine={false} width={35} />
-                <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: 12 }} />
-                <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ fill: 'hsl(var(--primary))', r: 4 }} name={cfg.label} />
-              </LineChart>
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2.5}
+                  fill="url(#chartGradient)" dot={{ fill: 'hsl(var(--primary))', r: 4, strokeWidth: 0 }} name={cfg.label} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
           {pairedData && pairedData.length > 1 && (
             <div className="h-52 mt-4">
               <p className="text-xs font-semibold text-muted-foreground mb-2">{cfg.label.replace(' L', ' P')}</p>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={pairedData}>
+                <AreaChart data={pairedData}>
+                  <defs>
+                    <linearGradient id="chartGradient2" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickLine={false} axisLine={false} />
                   <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickLine={false} axisLine={false} width={35} />
-                  <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: 12 }} />
-                  <Line type="monotone" dataKey="value" stroke="hsl(var(--accent))" strokeWidth={2.5} dot={{ fill: 'hsl(var(--accent))', r: 4 }} name={cfg.label.replace(' L', ' P')} />
-                </LineChart>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2.5}
+                    fill="url(#chartGradient2)" dot={{ fill: 'hsl(var(--primary))', r: 4, strokeWidth: 0 }} name={cfg.label.replace(' L', ' P')} />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           )}
@@ -183,7 +208,7 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
         </div>
       </motion.div>
 
-      {/* New measurement form - bottom sheet style */}
+      {/* New measurement form */}
       <AnimatePresence>
         {showForm && (
           <>
@@ -191,14 +216,12 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl max-h-[85vh] flex flex-col">
-              {/* Sticky header */}
               <div className="flex items-center justify-between p-4 border-b border-border/50 flex-shrink-0">
                 <h3 className="text-lg font-bold">Nowy pomiar</h3>
                 <button onClick={() => setShowForm(false)} className="p-2 rounded-full bg-muted min-w-[44px] min-h-[44px] flex items-center justify-center">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              {/* Scrollable fields - vertical layout */}
               <div className="overflow-y-auto flex-1 p-4 space-y-3">
                 {FORM_FIELDS.map(f => (
                   <div key={f.key}>
@@ -209,8 +232,7 @@ export default function BodyPage({ measurements, onAdd }: BodyPageProps) {
                   </div>
                 ))}
               </div>
-              {/* Sticky save button */}
-              <div className="p-4 border-t border-border/50 flex-shrink-0">
+              <div className="p-4 border-t border-border/50 flex-shrink-0" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
                 <button onClick={handleSubmit} className="w-full py-4 bg-primary rounded-2xl text-primary-foreground font-bold text-base flex items-center justify-center gap-2 min-h-[44px] shadow-lg shadow-primary/25">
                   <Save className="w-5 h-5" /> Zapisz pomiary
                 </button>

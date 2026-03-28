@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, RotateCcw, Clock, ChevronRight, ChevronLeft, Plus, X, Check, Trash2, Calendar, Edit3, Save } from 'lucide-react';
+import { Play, Pause, RotateCcw, Clock, ChevronRight, ChevronLeft, Plus, X, Check, Trash2, Calendar, Edit3, Save, AlertTriangle } from 'lucide-react';
 import { TrainingPlan, PlanExercise, WorkoutSession, ScheduledWorkout } from '@/lib/local-storage';
 
 interface WorkoutPageProps {
@@ -79,6 +79,7 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
   const [activeWorkout, setActiveWorkout] = useState<{ name: string; startTime: number; exercises: ActiveExercise[] } | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showIncompleteDialog, setShowIncompleteDialog] = useState(false);
 
   const openNewPlan = () => { setEditingPlan(null); setPlanName(''); setPlanExercises([]); setView('plan-editor'); };
 
@@ -142,18 +143,35 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
     });
   };
 
-  const finishWorkout = () => {
+  const attemptFinish = () => {
+    if (!activeWorkout) return;
+    const allCompleted = activeWorkout.exercises.every(ex => ex.sets.every(s => s.completed));
+    if (allCompleted) {
+      finishWorkout(true);
+    } else {
+      setShowIncompleteDialog(true);
+    }
+  };
+
+  const finishWorkout = (completed: boolean) => {
     if (!activeWorkout) return;
     const duration = Math.round((Date.now() - activeWorkout.startTime) / 60000);
-    const allCompleted = activeWorkout.exercises.every(ex => ex.sets.every(s => s.completed));
     onAdd({
       name: activeWorkout.name,
       date: new Date().toISOString().split('T')[0],
       duration: Math.max(duration, 1),
-      completed: allCompleted,
+      completed,
       exercises: activeWorkout.exercises,
     });
     setActiveWorkout(null);
+    setShowIncompleteDialog(false);
+    setView('main');
+  };
+
+  const abortWorkout = () => {
+    // Exit without saving as completed
+    setActiveWorkout(null);
+    setShowIncompleteDialog(false);
     setView('main');
   };
 
@@ -174,7 +192,6 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
     return `${y}-${m}-${String(day).padStart(2, '0')}`;
   };
 
-  // Get all scheduled workouts for a date (multi-workout support)
   const getScheduledForDate = (date: string) => scheduled.filter(s => s.date === date);
 
   // Plan editor view
@@ -259,15 +276,45 @@ export default function WorkoutPage({ workouts, onAdd, plans, onAddPlan, onUpdat
         </div>
         <div className="mt-4 flex gap-3">
           <button onClick={() => { setActiveWorkout(null); setView('main'); }} className="flex-1 py-3.5 bg-muted rounded-2xl font-bold text-sm text-muted-foreground min-h-[44px]">Anuluj</button>
-          <button onClick={finishWorkout} className="flex-1 py-3.5 bg-primary rounded-2xl font-bold text-sm text-primary-foreground shadow-lg shadow-primary/25 flex items-center justify-center gap-2 min-h-[44px]">
+          <button onClick={attemptFinish} className="flex-1 py-3.5 bg-primary rounded-2xl font-bold text-sm text-primary-foreground shadow-lg shadow-primary/25 flex items-center justify-center gap-2 min-h-[44px]">
             <Save className="w-4 h-4" /> Zakończ trening
           </button>
         </div>
+
+        {/* Incomplete workout dialog */}
+        <AnimatePresence>
+          {showIncompleteDialog && (
+            <>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-foreground/30 z-50" onClick={() => setShowIncompleteDialog(false)} />
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+                className="fixed inset-x-6 top-1/2 -translate-y-1/2 z-50 bg-card rounded-2xl p-6 shadow-xl max-w-sm mx-auto">
+                <div className="flex items-center gap-3 mb-3">
+                  <AlertTriangle className="w-6 h-6 text-accent flex-shrink-0" />
+                  <h3 className="text-lg font-bold">Nieukończony trening</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-5">
+                  Nie wszystkie ćwiczenia zostały odhaczone. Czy na pewno chcesz zakończyć ten trening bez zapisywania go jako wykonany?
+                </p>
+                <div className="flex flex-col gap-2">
+                  <button onClick={() => setShowIncompleteDialog(false)}
+                    className="w-full py-3.5 bg-primary rounded-2xl text-primary-foreground font-bold min-h-[44px]">
+                    Wróć do treningu
+                  </button>
+                  <button onClick={abortWorkout}
+                    className="w-full py-3.5 bg-destructive/10 rounded-2xl text-destructive font-bold min-h-[44px]">
+                    Zakończ mimo to
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </motion.div>
     );
   }
 
-  // Calendar view - with multiple workouts per day
+  // Calendar view
   if (view === 'calendar') {
     const days = getDaysInMonth(calendarMonth);
     const monthLabel = calendarMonth.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });

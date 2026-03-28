@@ -1,25 +1,26 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Scale, Ruler, User, Calendar, ChevronLeft, ChevronRight, Check, Bell, BellOff, Sun, Moon, Monitor, Palette } from 'lucide-react';
+import { RefreshCw, Scale, Ruler, User, Calendar, ChevronLeft, ChevronRight, Check, Bell, BellOff, Sun, Moon, Monitor, Palette, Edit3 } from 'lucide-react';
 import { ProfileInput, CalculatedTargets, calculateBMI, getBMICategory, calculateTargets, ACTIVITY_OPTIONS, GOAL_OPTIONS, ActivityLevel, Goal } from '@/lib/calculator';
-import { getProfile } from '@/lib/local-storage';
+import { getProfile, setTargetsOverride, getTargets } from '@/lib/local-storage';
 
 interface SettingsPageProps {
   profile: ProfileInput;
   targets: CalculatedTargets | null;
   onRecalculate: (profile: ProfileInput) => void;
+  onRefresh?: () => void;
 }
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
 
-// Color themes
+// New pastel palette
 const COLOR_THEMES = [
-  { name: 'Zielony', hue: '160 84% 39%', ring: '160 84% 39%' },
-  { name: 'Różowy', hue: '340 82% 52%', ring: '340 82% 52%' },
-  { name: 'Niebieski', hue: '210 90% 50%', ring: '210 90% 50%' },
-  { name: 'Beżowy', hue: '30 50% 50%', ring: '30 50% 50%' },
-  { name: 'Zinc', hue: '220 15% 50%', ring: '220 15% 50%' },
+  { name: 'Różowy', hex: '#FFD1DC', hue: '349 100% 91%' },
+  { name: 'Niebieski', hex: '#AEC6CF', hue: '199 33% 78%' },
+  { name: 'Beżowy', hex: '#EEDFCC', hue: '30 43% 86%' },
+  { name: 'Zielony', hex: '#C1E1C1', hue: '120 33% 82%' },
+  { name: 'Szary', hex: '#D3D3D3', hue: '0 0% 83%' },
 ];
 
 type ThemeMode = 'light' | 'dark' | 'system';
@@ -35,7 +36,7 @@ function getStoredTheme(): ThemeMode {
   return (localStorage.getItem('ft_theme_mode') as ThemeMode) || 'system';
 }
 function getStoredColor(): number {
-  return Number(localStorage.getItem('ft_theme_color') || '0');
+  return Number(localStorage.getItem('ft_theme_color') || '3'); // default green
 }
 function getStoredReminders(): Reminder[] {
   try {
@@ -48,10 +49,9 @@ function getStoredReminders(): Reminder[] {
   } catch { return []; }
 }
 
-// Recalc stepper (shorter, no name/gender)
+// Recalc stepper
 function RecalcStepper({ profile, onComplete, onCancel }: { profile: ProfileInput; onComplete: (p: ProfileInput) => void; onCancel: () => void }) {
-  const STEPS = ['body', 'age', 'activity', 'goal', 'pace'] as const;
-  type Step = typeof STEPS[number];
+  const STEPS = ['body', 'age', 'activity', 'goal'] as const;
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState(1);
   const [weight, setWeight] = useState(String(profile.weight));
@@ -60,19 +60,13 @@ function RecalcStepper({ profile, onComplete, onCancel }: { profile: ProfileInpu
   const [activity, setActivity] = useState<ActivityLevel>(profile.activityLevel);
   const [goal, setGoal] = useState<Goal>(profile.goal);
   const [mealsPerDay, setMealsPerDay] = useState(profile.mealsPerDay);
-  const [monthlyKg, setMonthlyKg] = useState(0.8);
 
-  const current = STEPS[step];
-
-  // Skip pace step if maintain
-  const shouldShowPace = goal !== 'maintain';
-  const effectiveSteps = shouldShowPace ? STEPS : STEPS.filter(s => s !== 'pace');
-  const effectiveStep = effectiveSteps[step];
-  const isLast = step === effectiveSteps.length - 1;
+  const isLast = step === STEPS.length - 1;
 
   const canNext = () => {
-    if (effectiveStep === 'body') return Number(weight) > 0 && Number(height) > 0;
-    if (effectiveStep === 'age') return Number(age) > 0 && Number(age) < 120;
+    const current = STEPS[step];
+    if (current === 'body') return Number(weight) > 0 && Number(height) > 0;
+    if (current === 'age') return Number(age) > 0 && Number(age) < 120;
     return true;
   };
 
@@ -84,15 +78,14 @@ function RecalcStepper({ profile, onComplete, onCancel }: { profile: ProfileInpu
 
   const finish = () => {
     onComplete({
-      ...profile, // keep name and gender from localStorage
+      ...profile,
       weight: Number(weight),
       height: Number(height),
       age: Number(age),
       activityLevel: activity,
       goal,
       mealsPerDay,
-      monthlyChange: shouldShowPace ? monthlyKg : undefined,
-    } as any);
+    });
   };
 
   const variants = {
@@ -102,7 +95,7 @@ function RecalcStepper({ profile, onComplete, onCancel }: { profile: ProfileInpu
   };
 
   const renderStep = () => {
-    switch (effectiveStep) {
+    switch (STEPS[step]) {
       case 'body':
         return (
           <div className="space-y-4">
@@ -147,6 +140,7 @@ function RecalcStepper({ profile, onComplete, onCancel }: { profile: ProfileInpu
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Twój cel 🎯</h2>
+            <p className="text-xs text-muted-foreground">Redukcja: −300 kcal od TDEE • Masa: +300 kcal do TDEE</p>
             <div className="space-y-2">
               {GOAL_OPTIONS.map(opt => (
                 <button key={opt.value} onClick={() => setGoal(opt.value)}
@@ -167,30 +161,13 @@ function RecalcStepper({ profile, onComplete, onCancel }: { profile: ProfileInpu
             </div>
           </div>
         );
-      case 'pace':
-        return (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">{goal === 'cut' ? 'Tempo redukcji' : 'Tempo budowy masy'} ⚡</h2>
-            <p className="text-sm text-muted-foreground">Ile kg miesięcznie chcesz {goal === 'cut' ? 'schudnąć' : 'przytyć'}?</p>
-            <div className="py-6 text-center">
-              <span className="text-5xl font-black text-primary">{monthlyKg.toFixed(1)}</span>
-              <span className="text-lg text-muted-foreground ml-1">kg/msc</span>
-            </div>
-            <input type="range" min="0.5" max="1.0" step="0.1" value={monthlyKg}
-              onChange={e => setMonthlyKg(Number(e.target.value))}
-              className="w-full accent-primary" />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>0.5 kg</span><span>1.0 kg</span>
-            </div>
-          </div>
-        );
     }
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col px-6 pt-16 pb-8 max-w-lg mx-auto">
       <div className="flex gap-1.5 mb-8">
-        {effectiveSteps.map((_, i) => (
+        {STEPS.map((_, i) => (
           <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? 'bg-primary' : 'bg-muted'}`} />
         ))}
       </div>
@@ -215,11 +192,13 @@ function RecalcStepper({ profile, onComplete, onCancel }: { profile: ProfileInpu
   );
 }
 
-export default function SettingsPage({ profile, targets, onRecalculate }: SettingsPageProps) {
+export default function SettingsPage({ profile, targets, onRecalculate, onRefresh }: SettingsPageProps) {
   const [showStepper, setShowStepper] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredTheme);
   const [colorIdx, setColorIdx] = useState(getStoredColor);
   const [reminders, setReminders] = useState<Reminder[]>(getStoredReminders);
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   const bmi = useMemo(() => {
     if (profile.weight && profile.height) return calculateBMI(profile.weight, profile.height);
@@ -228,7 +207,6 @@ export default function SettingsPage({ profile, targets, onRecalculate }: Settin
 
   const bmiInfo = useMemo(() => bmi ? getBMICategory(bmi) : null, [bmi]);
 
-  // Apply theme mode
   useEffect(() => {
     localStorage.setItem('ft_theme_mode', themeMode);
     const root = document.documentElement;
@@ -236,23 +214,19 @@ export default function SettingsPage({ profile, targets, onRecalculate }: Settin
     if (themeMode === 'dark') root.classList.add('dark');
     else if (themeMode === 'light') root.classList.remove('dark');
     else {
-      // system
       if (window.matchMedia('(prefers-color-scheme: dark)').matches) root.classList.add('dark');
     }
   }, [themeMode]);
 
-  // Apply color theme
   useEffect(() => {
     localStorage.setItem('ft_theme_color', String(colorIdx));
     const theme = COLOR_THEMES[colorIdx];
     if (theme) {
       document.documentElement.style.setProperty('--primary', theme.hue);
-      document.documentElement.style.setProperty('--ring', theme.ring);
-      document.documentElement.style.setProperty('--calories-ring', theme.ring);
+      document.documentElement.style.setProperty('--ring', theme.hue);
     }
   }, [colorIdx]);
 
-  // Save reminders
   useEffect(() => {
     localStorage.setItem('ft_reminders', JSON.stringify(reminders));
   }, [reminders]);
@@ -261,9 +235,7 @@ export default function SettingsPage({ profile, targets, onRecalculate }: Settin
     setReminders(prev => prev.map(r => {
       if (r.id !== id) return r;
       const newEnabled = !r.enabled;
-      if (newEnabled && 'Notification' in window) {
-        Notification.requestPermission();
-      }
+      if (newEnabled && 'Notification' in window) Notification.requestPermission();
       return { ...r, enabled: newEnabled };
     }));
   };
@@ -284,6 +256,23 @@ export default function SettingsPage({ profile, targets, onRecalculate }: Settin
     setReminders(prev => prev.filter(r => r.id !== id));
   };
 
+  // Manual edit targets
+  const startEdit = (field: string, currentValue: number | undefined) => {
+    setEditingField(field);
+    setEditValue(String(currentValue ?? ''));
+  };
+
+  const saveEdit = () => {
+    if (!editingField || !editValue) { setEditingField(null); return; }
+    const val = Number(editValue);
+    if (isNaN(val) || val <= 0) { setEditingField(null); return; }
+    const update: any = {};
+    update[editingField] = val;
+    setTargetsOverride(update);
+    setEditingField(null);
+    onRefresh?.();
+  };
+
   if (showStepper) {
     return (
       <RecalcStepper
@@ -297,6 +286,13 @@ export default function SettingsPage({ profile, targets, onRecalculate }: Settin
     );
   }
 
+  const targetFields = [
+    { key: 'calories', label: 'kcal', value: targets?.calories, colorClass: 'text-primary' },
+    { key: 'protein', label: 'Białko', value: targets?.protein, colorClass: '', suffix: 'g', style: { color: '#ace3fa' } },
+    { key: 'carbs', label: 'Węglowodany', value: targets?.carbs, colorClass: '', suffix: 'g', style: { color: '#cfacfa' } },
+    { key: 'fat', label: 'Tłuszcze', value: targets?.fat, colorClass: '', suffix: 'g', style: { color: '#f5e8a9' } },
+  ];
+
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="px-4 pt-2 pb-28">
       <motion.div variants={item} className="mb-5">
@@ -304,7 +300,7 @@ export default function SettingsPage({ profile, targets, onRecalculate }: Settin
         <p className="text-sm text-muted-foreground">Cześć, {profile.name}!</p>
       </motion.div>
 
-      {/* Daily targets */}
+      {/* Daily targets - editable */}
       <motion.div variants={item} className="ios-card p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-bold">Cele dzienne</h3>
@@ -313,22 +309,24 @@ export default function SettingsPage({ profile, targets, onRecalculate }: Settin
           </button>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-muted rounded-2xl p-3 text-center">
-            <p className="text-2xl font-black text-primary">{targets?.calories ?? '—'}</p>
-            <p className="text-[10px] text-muted-foreground font-semibold">kcal</p>
-          </div>
-          <div className="bg-muted rounded-2xl p-3 text-center">
-            <p className="text-2xl font-black macro-protein">{targets?.protein ?? '—'}g</p>
-            <p className="text-[10px] text-muted-foreground font-semibold">Białko</p>
-          </div>
-          <div className="bg-muted rounded-2xl p-3 text-center">
-            <p className="text-2xl font-black macro-carbs">{targets?.carbs ?? '—'}g</p>
-            <p className="text-[10px] text-muted-foreground font-semibold">Węglowodany</p>
-          </div>
-          <div className="bg-muted rounded-2xl p-3 text-center">
-            <p className="text-2xl font-black macro-fat">{targets?.fat ?? '—'}g</p>
-            <p className="text-[10px] text-muted-foreground font-semibold">Tłuszcze</p>
-          </div>
+          {targetFields.map(f => (
+            <button key={f.key} onClick={() => startEdit(f.key, f.value)}
+              className="bg-muted rounded-2xl p-3 text-center relative active:scale-[0.97] transition-transform">
+              {editingField === f.key ? (
+                <div onClick={e => e.stopPropagation()}>
+                  <input type="number" inputMode="decimal" value={editValue} onChange={e => setEditValue(e.target.value)}
+                    autoFocus onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                    className="w-full text-2xl font-black text-center bg-transparent focus:outline-none" />
+                </div>
+              ) : (
+                <>
+                  <p className="text-2xl font-black" style={f.style || {}} >{f.value ?? '—'}{f.suffix || ''}</p>
+                  <Edit3 className="w-3 h-3 text-muted-foreground absolute top-2 right-2" />
+                </>
+              )}
+              <p className="text-[10px] text-muted-foreground font-semibold">{f.label}</p>
+            </button>
+          ))}
         </div>
         {targets && (
           <div className="mt-3 text-xs text-muted-foreground space-y-1">
@@ -358,7 +356,7 @@ export default function SettingsPage({ profile, targets, onRecalculate }: Settin
         </motion.div>
       )}
 
-      {/* Personal data - widget style */}
+      {/* Personal data */}
       <motion.div variants={item} className="ios-card p-4 mb-4">
         <h3 className="text-sm font-bold mb-3">Dane osobiste</h3>
         <div className="grid grid-cols-3 gap-2">
@@ -411,7 +409,6 @@ export default function SettingsPage({ profile, targets, onRecalculate }: Settin
       <motion.div variants={item} className="ios-card p-4 mb-4">
         <h3 className="text-sm font-bold mb-3 flex items-center gap-2"><Palette className="w-4 h-4 text-primary" /> Wygląd aplikacji</h3>
 
-        {/* Theme mode */}
         <p className="text-xs text-muted-foreground mb-2">Tryb</p>
         <div className="flex gap-2 mb-4">
           {([
@@ -428,13 +425,12 @@ export default function SettingsPage({ profile, targets, onRecalculate }: Settin
           ))}
         </div>
 
-        {/* Color palette */}
         <p className="text-xs text-muted-foreground mb-2">Kolor wiodący</p>
         <div className="flex gap-3 justify-center">
           {COLOR_THEMES.map((theme, i) => (
             <button key={i} onClick={() => setColorIdx(i)}
               className={`w-10 h-10 rounded-full transition-all min-w-[44px] min-h-[44px] ${colorIdx === i ? 'ring-2 ring-offset-2 ring-foreground/30' : ''}`}
-              style={{ backgroundColor: `hsl(${theme.hue})` }}
+              style={{ backgroundColor: theme.hex }}
               title={theme.name} />
           ))}
         </div>
