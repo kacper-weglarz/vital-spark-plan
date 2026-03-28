@@ -41,10 +41,12 @@
     --card-shadow: 0 2px 16px -2px hsl(220 20% 10% / 0.06);
     --card-shadow-lg: 0 8px 32px -4px hsl(220 20% 10% / 0.1);
 
-    --protein: 210 90% 56%;
-    --carbs: 35 95% 55%;
-    --fat: 340 82% 60%;
-    --calories-ring: 160 84% 39%;
+    /* New macro colors */
+    --protein: 195 92% 82%;
+    --carbs: 270 88% 82%;
+    --fat: 48 87% 81%;
+    --calories-ring: 120 100% 50%;
+    --overage: 350 92% 83%;
 
     --safe-bottom: env(safe-area-inset-bottom, 0px);
 
@@ -90,10 +92,11 @@
     --card-shadow: 0 2px 16px -2px hsl(0 0% 0% / 0.3);
     --card-shadow-lg: 0 8px 32px -4px hsl(0 0% 0% / 0.4);
 
-    --protein: 210 90% 56%;
-    --carbs: 35 95% 55%;
-    --fat: 340 82% 60%;
-    --calories-ring: 160 84% 39%;
+    --protein: 195 92% 82%;
+    --carbs: 270 88% 82%;
+    --fat: 48 87% 81%;
+    --calories-ring: 120 100% 50%;
+    --overage: 350 92% 83%;
 
     --sidebar-background: 220 15% 10%;
     --sidebar-foreground: 210 20% 95%;

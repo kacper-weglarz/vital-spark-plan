@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Flame, Zap, TrendingUp, AlertTriangle, CheckCircle2, Circle, Dumbbell } from 'lucide-react';
+import { Flame, Zap, Rocket, CheckCircle2, Circle, Dumbbell, Utensils } from 'lucide-react';
 import FitnessRings from '@/components/FitnessRings';
 import { UserGoals } from '@/lib/store';
 import { TrainingPlan, WorkoutSession, ScheduledWorkout } from '@/lib/local-storage';
@@ -36,7 +36,6 @@ export default function HomePage({ dailyTotals, goals, streak, onNavigate, stagn
     .map(s => plans.find(p => p.id === s.planId))
     .filter(Boolean) as TrainingPlan[];
 
-  // Check if a workout for a plan is completed today
   const isPlanCompletedToday = (plan: TrainingPlan) => {
     return workouts.some(w =>
       w.date === todayStr &&
@@ -48,30 +47,6 @@ export default function HomePage({ dailyTotals, goals, streak, onNavigate, stagn
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="px-4 pt-2 pb-28">
-      {/* Header with date + flame */}
-      <motion.div variants={item} className="mb-5 flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground font-medium capitalize">{dayName}</p>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-foreground">{dateStr}</h1>
-            {streak > 0 && (
-              <div className="flex items-center gap-1 bg-accent/15 px-2 py-0.5 rounded-full">
-                <Flame className="w-4 h-4 text-accent" />
-                <span className="text-xs font-bold text-accent">{streak}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Stagnation warning */}
-      {stagnationWarning && (
-        <motion.div variants={item} className="ios-card p-4 mb-4 flex items-center gap-3 bg-accent/5 border border-accent/20">
-          <AlertTriangle className="w-5 h-5 text-accent flex-shrink-0" />
-          <p className="text-xs font-medium text-foreground">{stagnationWarning}</p>
-        </motion.div>
-      )}
-
       {/* Apple Fitness Rings */}
       <motion.div variants={item} className="ios-card p-5 mb-4">
         <FitnessRings
@@ -83,71 +58,77 @@ export default function HomePage({ dailyTotals, goals, streak, onNavigate, stagn
         />
       </motion.div>
 
-      {/* Quick Actions - 3D tactile buttons */}
-      <motion.div variants={item} className="grid grid-cols-2 gap-3 mb-4">
+      {/* Consolidated Daily Plan Card */}
+      <motion.div variants={item} className="ios-card p-4">
+        {/* Date + streak */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-bold text-foreground capitalize">{dateStr} <span className="text-muted-foreground font-medium capitalize">{dayName}</span></p>
+            {streak > 0 && (
+              <div className="flex items-center gap-0.5 bg-accent/15 px-1.5 py-0.5 rounded-full">
+                <Flame className="w-3.5 h-3.5 text-accent" />
+                <span className="text-[10px] font-bold text-accent">{streak}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Stagnation warning */}
+        {stagnationWarning && (
+          <div className="p-3 mb-3 bg-accent/5 border border-accent/20 rounded-xl">
+            <p className="text-xs font-medium text-foreground">{stagnationWarning}</p>
+          </div>
+        )}
+
+        {/* Today's workout section */}
+        <div className="mb-3">
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+            <Dumbbell className="w-3.5 h-3.5 text-primary" /> Twój dzisiejszy plan:
+          </h3>
+          {todayPlans.length > 0 ? (
+            <div className="space-y-2">
+              {todayPlans.map(plan => {
+                const completed = isPlanCompletedToday(plan);
+                return (
+                  <div key={plan.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold truncate">{plan.name}</p>
+                        {completed ? (
+                          <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
+                        ) : (
+                          <Circle className="w-4 h-4 text-muted-foreground/30 flex-shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{plan.exercises.length} ćwiczeń</p>
+                    </div>
+                    <button
+                      onClick={() => onNavigate('workout')}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-primary/10 rounded-xl text-xs font-bold text-primary min-h-[36px] active:scale-95 transition-transform"
+                    >
+                      <Rocket className="w-3.5 h-3.5" /> Start
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground py-2">
+              Brak zaplanowanych treningów. Przejdź do kalendarza.
+            </p>
+          )}
+        </div>
+
+        {/* Add meal action */}
         <button
           onClick={() => onNavigate('meals')}
-          className="relative p-4 rounded-2xl text-left active:scale-[0.95] transition-all min-h-[44px]
-            bg-gradient-to-b from-card to-muted border border-border/60
-            shadow-[0_4px_12px_-2px_hsl(var(--foreground)/0.08),inset_0_1px_0_hsl(0_0%_100%/0.6)]
-            dark:shadow-[0_4px_12px_-2px_hsl(var(--foreground)/0.2),inset_0_1px_0_hsl(0_0%_100%/0.05)]"
+          className="w-full flex items-center gap-3 p-3 bg-muted/50 rounded-xl active:scale-[0.98] transition-transform min-h-[44px]"
         >
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-2">
-            <Zap className="w-4.5 h-4.5 text-primary" />
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Zap className="w-4 h-4 text-primary" />
           </div>
-          <p className="text-sm font-bold">Dodaj posiłek</p>
+          <span className="text-sm font-bold">Dodaj posiłek</span>
         </button>
-        <button
-          onClick={() => onNavigate('workout')}
-          className="relative p-4 rounded-2xl text-left active:scale-[0.95] transition-all min-h-[44px]
-            bg-gradient-to-b from-card to-muted border border-border/60
-            shadow-[0_4px_12px_-2px_hsl(var(--foreground)/0.08),inset_0_1px_0_hsl(0_0%_100%/0.6)]
-            dark:shadow-[0_4px_12px_-2px_hsl(var(--foreground)/0.2),inset_0_1px_0_hsl(0_0%_100%/0.05)]"
-        >
-          <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center mb-2">
-            <TrendingUp className="w-4.5 h-4.5 text-accent" />
-          </div>
-          <p className="text-sm font-bold">Rozpocznij trening</p>
-        </button>
-      </motion.div>
-
-      {/* Today's Plan */}
-      <motion.div variants={item} className="ios-card p-4">
-        <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-          <Dumbbell className="w-4 h-4 text-primary" /> Twój dzisiejszy plan:
-        </h3>
-        {todayPlans.length > 0 ? (
-          <div className="space-y-3">
-            {todayPlans.map(plan => {
-              const completed = isPlanCompletedToday(plan);
-              return (
-                <div key={plan.id} className="p-3 bg-muted/50 rounded-xl">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
-                    {dayName}, {dateStr}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-base font-bold flex-1">{plan.name}</p>
-                    {completed ? (
-                      <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
-                    ) : (
-                      <Circle className="w-5 h-5 text-muted-foreground/30 flex-shrink-0" />
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {plan.exercises.length} ćwiczeń
-                  </p>
-                  <p className="text-[10px] text-muted-foreground/70 mt-1">
-                    Plan dodany do dzisiaj w Treningach
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground text-center py-4">
-            Brak zaplanowanych treningów na dziś. Przejdź do kalendarza treningów, aby dodać plan.
-          </p>
-        )}
       </motion.div>
     </motion.div>
   );
