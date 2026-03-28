@@ -102,20 +102,8 @@ export interface Product {
   barcode?: string;
 }
 
-const DEFAULT_PRODUCTS: Product[] = [
-  { id: '1', name: 'Pierś z kurczaka', calories: 165, protein: 31, carbs: 0, fat: 3.6, serving_size: '100g' },
-  { id: '2', name: 'Ryż biały', calories: 130, protein: 2.7, carbs: 28, fat: 0.3, serving_size: '100g' },
-  { id: '3', name: 'Jajko', calories: 155, protein: 13, carbs: 1.1, fat: 11, serving_size: '100g' },
-  { id: '4', name: 'Banan', calories: 89, protein: 1.1, carbs: 23, fat: 0.3, serving_size: '100g' },
-  { id: '5', name: 'Owsianka', calories: 68, protein: 2.4, carbs: 12, fat: 1.4, serving_size: '100g' },
-  { id: '6', name: 'Łosoś', calories: 208, protein: 20, carbs: 0, fat: 13, serving_size: '100g' },
-  { id: '7', name: 'Brokuły', calories: 34, protein: 2.8, carbs: 7, fat: 0.4, serving_size: '100g' },
-  { id: '8', name: 'Twaróg', calories: 98, protein: 11, carbs: 3.4, fat: 4.3, serving_size: '100g' },
-  { id: '9', name: 'Chleb pełnoziarnisty', calories: 247, protein: 13, carbs: 41, fat: 3.4, serving_size: '100g' },
-  { id: '10', name: 'Masło orzechowe', calories: 588, protein: 25, carbs: 20, fat: 50, serving_size: '100g' },
-  { id: '11', name: 'Jogurt naturalny', calories: 61, protein: 3.5, carbs: 4.7, fat: 3.3, serving_size: '100g' },
-  { id: '12', name: 'Makaron', calories: 131, protein: 5, carbs: 25, fat: 1.1, serving_size: '100g' },
-];
+// No default products - empty database, users add via scanner or manually
+const DEFAULT_PRODUCTS: Product[] = [];
 
 export function getProducts(): Product[] {
   const custom = get<Product[]>(KEYS.PRODUCTS, []);
